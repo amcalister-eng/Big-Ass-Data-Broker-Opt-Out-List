@@ -747,7 +747,7 @@ async function callAnthropic(systemPrompt, userPrompt) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }]
     })
@@ -767,7 +767,7 @@ async function runDomains() {
     setStepStatus(domain.id, 'running');
     updateProgress(i, total);
     try {
-      const systemPrompt = `You are an AI governance expert assessing an AI project. For each question, provide a JSON response evaluating whether the project has addressed this governance requirement based on the project description. Return ONLY valid JSON in this exact format: {"questions":[{"id":1,"confidence":0.0,"evidence":"brief evidence from description","gap":"what is missing or unclear","controls":["control 1","control 2"],"standards":["standard/reference"]}]}. Confidence 0.0=no evidence, 0.5=partial, 1.0=fully addressed. Be realistic and critical — assume gaps exist unless explicitly evidenced.`;
+      const systemPrompt = `You are an AI governance expert. Assess each question against the project description. Return ONLY valid JSON — no markdown, no commentary. Keep all string values SHORT (evidence ≤ 15 words, gap ≤ 15 words, max 2 controls, max 2 standards). Format: {"questions":[{"id":1,"confidence":0.0,"evidence":"one short phrase","gap":"one short phrase or null","controls":["control A","control B"],"standards":["Ref1"]}]}. Confidence: 0.0=absent, 0.4=mentioned, 0.7=partial, 1.0=fully addressed. Be critical — default to gaps unless explicitly evidenced.`;
       const qList = domain.questions.map((q, idx) => `${idx + 1}. ${q}`).join('\n');
       const userPrompt = `Project: "${state.projectName}"\nDescription: ${state.projectDesc}\n\nDomain: ${domain.label}\nAssess these questions:\n${qList}`;
       const raw = await callAnthropic(systemPrompt, userPrompt);
@@ -815,9 +815,53 @@ async function runRAI() {
 }
 
 function extractJSON(text) {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (match) return JSON.parse(match[0]);
-  return JSON.parse(text);
+  // Strip markdown fences
+  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  // Try as-is first
+  try { return JSON.parse(cleaned); } catch (_) {}
+  // Extract outermost {...} block
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    try { return JSON.parse(cleaned.slice(start, end + 1)); } catch (_) {}
+  }
+  // Repair truncated JSON: close any open strings, arrays, and objects
+  const partial = start !== -1 ? cleaned.slice(start) : cleaned;
+  const repaired = repairJSON(partial);
+  return JSON.parse(repaired);
+}
+
+function repairJSON(str) {
+  let result = str.trim();
+  // Remove trailing comma before attempting to close
+  result = result.replace(/,\s*$/, '');
+  // Walk character-by-character tracking open structures
+  const stack = [];
+  let inStr = false;
+  let escaped = false;
+  let lastCompletePos = 0;
+  for (let i = 0; i < result.length; i++) {
+    const c = result[i];
+    if (escaped) { escaped = false; continue; }
+    if (c === '\\' && inStr) { escaped = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === '{') stack.push('}');
+    else if (c === '[') stack.push(']');
+    else if (c === '}' || c === ']') {
+      if (stack.length && stack[stack.length - 1] === c) {
+        stack.pop();
+        lastCompletePos = i + 1;
+      }
+    }
+  }
+  // If we're mid-string, close it
+  if (inStr) result += '"';
+  // Remove any dangling comma before closing
+  result = result.replace(/,\s*$/, '');
+  // Close all unclosed structures
+  result += stack.reverse().join('');
+  return result;
 }
 
 // ============================================================
