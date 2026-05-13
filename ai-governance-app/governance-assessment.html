@@ -9,94 +9,106 @@
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
 :root {
+  /* Woolworths palette — full spectrum */
   --ocean: #1565C0;
   --ocean-light: #1976D2;
   --ocean-dark: #0D47A1;
   --sky: #42A5F5;
   --sky-light: #90CAF9;
-  --sun: #FFC107;
+  --sky-pale: #E3F2FD;
+  --sun: #F9A825;
+  --sun-light: #FFF8E1;
   --earth: #F26522;
+  --earth-light: #FFF3E0;
+  --grain: #EDE0C4;
+  --grain-light: #FDF8EF;
   --land: #00A651;
+  --land-light: #E8F5E9;
   --berry: #7B1FA2;
-  --midnight: #0A1628;
-  --midnight-card: #0F2044;
-  --midnight-border: #1E3A6E;
-  --text-primary: #E8F4FF;
-  --text-muted: #7FA8CC;
+  --berry-light: #F3E5F5;
+  /* Light theme surfaces */
+  --midnight: #EBF4FF;       /* page background — pale sky */
+  --midnight-card: #FFFFFF;  /* cards — white */
+  --midnight-border: #C4DCFA;/* border — light ocean */
+  --text-primary: #0D2D6B;   /* deep ocean for body text */
+  --text-muted: #5580A8;     /* mid ocean for secondary text */
 }
 * { box-sizing: border-box; }
 body { background: var(--midnight); color: var(--text-primary); font-family: 'Inter', system-ui, sans-serif; margin: 0; min-height: 100vh; }
+/* Light-theme overrides */
+
 .screen { display: none; }
 .screen.active { display: block; }
 .card { background: var(--midnight-card); border: 1px solid var(--midnight-border); border-radius: 12px; }
 .btn-primary { background: var(--ocean); color: white; border: none; border-radius: 8px; padding: 12px 28px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
 .btn-primary:hover { background: var(--ocean-light); }
-.btn-secondary { background: transparent; color: var(--sky); border: 1px solid var(--midnight-border); border-radius: 8px; padding: 8px 18px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
-.btn-secondary:hover { border-color: var(--sky); background: rgba(66,165,245,0.1); }
+.btn-secondary { background: white; color: var(--ocean); border: 1px solid var(--midnight-border); border-radius: 8px; padding: 8px 18px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.btn-secondary:hover { border-color: var(--ocean); background: var(--sky-pale); }
 .btn-secondary.active { background: var(--ocean); color: white; border-color: var(--ocean); }
-input, textarea, select { background: rgba(255,255,255,0.05); border: 1px solid var(--midnight-border); border-radius: 8px; color: var(--text-primary); padding: 10px 14px; width: 100%; font-size: 15px; transition: border-color 0.2s; }
-input:focus, textarea:focus, select:focus { outline: none; border-color: var(--sky); }
+input, textarea, select { background: var(--sky-pale); border: 1px solid var(--midnight-border); border-radius: 8px; color: var(--text-primary); padding: 10px 14px; width: 100%; font-size: 15px; transition: border-color 0.2s; }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--ocean); background: white; }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .tab-btn { background: transparent; color: var(--text-muted); border: none; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap; }
-.tab-btn.active { color: var(--sky); border-bottom-color: var(--sky); }
+.tab-btn.active { color: var(--ocean); border-bottom-color: var(--ocean); }
 .tab-btn:hover { color: var(--text-primary); }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
-.progress-bar-bg { background: rgba(255,255,255,0.08); border-radius: 4px; height: 6px; width: 100%; }
+.progress-bar-bg { background: var(--sky-pale); border-radius: 4px; height: 6px; width: 100%; }
 .progress-bar-fill { height: 6px; border-radius: 4px; background: var(--ocean); transition: width 0.4s ease; }
 .step-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
 .step-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; }
-.step-icon.pending { background: rgba(255,255,255,0.1); color: var(--text-muted); }
+.step-icon.pending { background: var(--sky-pale); color: var(--text-muted); }
 .step-icon.running { background: var(--ocean); color: white; }
 .step-icon.done { background: var(--land); color: white; }
 .step-icon.error { background: var(--earth); color: white; }
-.spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+.spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .risk-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
-.risk-critical { background: rgba(123,31,162,0.25); color: #CE93D8; border: 1px solid rgba(123,31,162,0.5); }
-.risk-high { background: rgba(242,101,34,0.2); color: #FFAB76; border: 1px solid rgba(242,101,34,0.4); }
-.risk-medium { background: rgba(255,193,7,0.15); color: #FFD54F; border: 1px solid rgba(255,193,7,0.35); }
-.risk-low { background: rgba(0,166,81,0.15); color: #69F0AE; border: 1px solid rgba(0,166,81,0.35); }
-.coverage-badge { background: rgba(21,101,192,0.25); color: var(--sky-light); border: 1px solid rgba(21,101,192,0.5); display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+.risk-critical { background: var(--berry-light); color: var(--berry); border: 1px solid rgba(123,31,162,0.35); }
+.risk-high { background: var(--earth-light); color: #BF4A0E; border: 1px solid rgba(242,101,34,0.35); }
+.risk-medium { background: var(--sun-light); color: #8A6200; border: 1px solid rgba(249,168,37,0.4); }
+.risk-low { background: var(--land-light); color: #006B32; border: 1px solid rgba(0,166,81,0.35); }
+.coverage-badge { background: var(--sky-pale); color: var(--ocean); border: 1px solid var(--midnight-border); display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
 .alert-banner { border-radius: 8px; padding: 10px 16px; margin-bottom: 8px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-.alert-critical { background: rgba(123,31,162,0.2); border: 1px solid rgba(123,31,162,0.5); color: #CE93D8; }
-.alert-high { background: rgba(242,101,34,0.15); border: 1px solid rgba(242,101,34,0.4); color: #FFAB76; }
-.domain-card { background: var(--midnight-card); border: 1px solid var(--midnight-border); border-radius: 10px; padding: 16px; transition: border-color 0.2s; }
-.domain-card:hover { border-color: var(--ocean-light); }
-.chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; background: rgba(255,255,255,0.07); color: var(--text-muted); }
+.alert-critical { background: var(--berry-light); border: 1px solid rgba(123,31,162,0.35); color: var(--berry); }
+.alert-high { background: var(--earth-light); border: 1px solid rgba(242,101,34,0.35); color: #BF4A0E; }
+.domain-card { background: white; border: 1px solid var(--midnight-border); border-radius: 10px; padding: 16px; transition: all 0.2s; }
+.domain-card:hover { border-color: var(--ocean); box-shadow: 0 2px 10px rgba(21,101,192,0.1); }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--midnight-border); transition: all 0.2s; background: white; color: var(--text-muted); }
 .chip.active { background: var(--ocean); color: white; border-color: var(--ocean); }
-.chip:hover { background: rgba(66,165,245,0.15); color: var(--sky); }
+.chip:hover { background: var(--sky-pale); color: var(--ocean); border-color: var(--sky); }
 details summary { cursor: pointer; list-style: none; }
 details summary::-webkit-details-marker { display: none; }
 details > summary::before { content: '▶'; margin-right: 8px; font-size: 10px; transition: transform 0.2s; display: inline-block; }
 details[open] > summary::before { transform: rotate(90deg); }
-.node-panel { background: var(--midnight-card); border-left: 1px solid var(--midnight-border); padding: 20px; width: 280px; flex-shrink: 0; overflow-y: auto; height: 580px; }
-.conf-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.node-panel { background: white; border-left: 1px solid var(--midnight-border); padding: 20px; width: 280px; flex-shrink: 0; overflow-y: auto; height: 580px; }
+.conf-bar { height: 6px; border-radius: 3px; background: var(--sky-pale); overflow: hidden; }
 .conf-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
 .rai-factor { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; }
-.rai-triggered { background: rgba(242,101,34,0.12); border: 1px solid rgba(242,101,34,0.3); }
-.rai-mitigated { background: rgba(0,166,81,0.1); border: 1px solid rgba(0,166,81,0.3); }
+.rai-triggered { background: var(--earth-light); border: 1px solid rgba(242,101,34,0.3); }
+.rai-mitigated { background: var(--land-light); border: 1px solid rgba(0,166,81,0.3); }
 .pathway-step { display: flex; flex-direction: column; align-items: center; flex: 1; }
-.pathway-step .dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--midnight-border); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--text-muted); background: var(--midnight-card); z-index: 1; }
+.pathway-step .dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--midnight-border); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--text-muted); background: white; z-index: 1; }
 .pathway-step.current .dot { border-color: var(--sun); color: var(--sun); background: rgba(255,193,7,0.15); }
 .pathway-step .label { font-size: 10px; color: var(--text-muted); margin-top: 4px; text-align: center; }
 .pathway-step.current .label { color: var(--sun); font-weight: 700; }
 .pathway-connector { flex: 1; height: 2px; background: var(--midnight-border); margin-top: 15px; }
 #graph-svg { display: block; }
-#d3-graph-container { position: relative; background: var(--midnight); border-radius: 0 0 12px 12px; border: 1px solid var(--midnight-border); border-top: none; overflow: hidden; }
-.graph-controls { display: flex; gap: 8px; align-items: center; background: var(--midnight-card); border: 1px solid var(--midnight-border); border-radius: 12px 12px 0 0; padding: 12px 16px; flex-wrap: wrap; }
-.zoom-btn { width: 32px; height: 32px; background: rgba(255,255,255,0.07); border: 1px solid var(--midnight-border); border-radius: 6px; color: var(--text-primary); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
-.zoom-btn:hover { background: rgba(255,255,255,0.14); }
+/* D3 graph keeps a dark bg for node visibility */
+#d3-graph-container { position: relative; background: #0D1F3C; border-radius: 0 0 12px 12px; border: 1px solid var(--midnight-border); border-top: none; overflow: hidden; }
+.graph-controls { display: flex; gap: 8px; align-items: center; background: white; border: 1px solid var(--midnight-border); border-radius: 12px 12px 0 0; padding: 12px 16px; flex-wrap: wrap; }
+.zoom-btn { width: 32px; height: 32px; background: var(--sky-pale); border: 1px solid var(--midnight-border); border-radius: 6px; color: var(--ocean); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+.zoom-btn:hover { background: var(--midnight-border); }
 #node-details-empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 40px 16px; }
 .gap-card { margin-bottom: 8px; }
-.gap-card summary { padding: 12px 16px; display: flex; align-items: center; gap: 10px; background: var(--midnight-card); border: 1px solid var(--midnight-border); border-radius: 8px; }
-details.gap-card[open] summary { border-radius: 8px 8px 0 0; }
-.gap-card .gap-body { background: rgba(15,32,68,0.6); border: 1px solid var(--midnight-border); border-top: none; border-radius: 0 0 8px 8px; padding: 16px; }
+.gap-card summary { padding: 12px 16px; display: flex; align-items: center; gap: 10px; background: white; border: 1px solid var(--midnight-border); border-radius: 8px; }
+details.gap-card[open] summary { border-radius: 8px 8px 0 0; border-bottom-color: var(--sky-pale); }
+.gap-card .gap-body { background: var(--sky-pale); border: 1px solid var(--midnight-border); border-top: none; border-radius: 0 0 8px 8px; padding: 16px; }
 .dot-indicator { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 @media print {
   .no-print { display: none !important; }
-  body { background: white; color: black; }
-  .card { border: 1px solid #ccc; }
+  body { background: white; color: #0D2D6B; }
+  .card, .domain-card, .gap-card summary { border: 1px solid #C4DCFA; box-shadow: none; }
 }
 </style>
 </head>
@@ -123,20 +135,20 @@ details.gap-card[open] summary { border-radius: 8px 8px 0 0; }
   <!-- Info Cards -->
   <div style="max-width:900px;margin:0 auto;padding:0 24px;">
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:-28px;margin-bottom:32px;">
-      <div class="card" style="padding:16px;text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:var(--sky);">10</div>
+      <div class="card" style="padding:16px;text-align:center;border-top:3px solid var(--ocean);">
+        <div style="font-size:28px;font-weight:800;color:var(--ocean);">10</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Governance Domains</div>
       </div>
-      <div class="card" style="padding:16px;text-align:center;">
+      <div class="card" style="padding:16px;text-align:center;border-top:3px solid var(--sun);">
         <div style="font-size:28px;font-weight:800;color:var(--sun);">130</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Questions Mapped</div>
       </div>
-      <div class="card" style="padding:16px;text-align:center;">
+      <div class="card" style="padding:16px;text-align:center;border-top:3px solid var(--land);">
         <div style="font-size:28px;font-weight:800;color:var(--land);">RAI</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Risk Scorecard</div>
       </div>
-      <div class="card" style="padding:16px;text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:var(--earth);">D3</div>
+      <div class="card" style="padding:16px;text-align:center;border-top:3px solid var(--berry);">
+        <div style="font-size:28px;font-weight:800;color:var(--berry);">D3</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Graph Analysis</div>
       </div>
     </div>
@@ -156,7 +168,7 @@ details.gap-card[open] summary { border-radius: 8px 8px 0 0; }
         <label style="font-size:13px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">Project Description</label>
         <textarea id="project-desc" rows="10" placeholder="Describe the AI system in detail: what it does, what data it uses, who it affects, deployment context, scale, autonomy level, integrations, and any known risks or constraints..."></textarea>
       </div>
-      <div id="setup-error" style="display:none;background:rgba(242,101,34,0.15);border:1px solid rgba(242,101,34,0.4);border-radius:8px;padding:10px 14px;font-size:13px;color:#FFAB76;margin-bottom:16px;"></div>
+      <div id="setup-error" style="display:none;background:var(--earth-light);border:1px solid rgba(242,101,34,0.4);border-radius:8px;padding:10px 14px;font-size:13px;color:#BF4A0E;margin-bottom:16px;"></div>
       <button class="btn-primary" onclick="startAssessment()" style="width:100%;font-size:16px;padding:14px;">Run Assessment &rarr;</button>
     </div>
   </div>
@@ -183,7 +195,7 @@ details.gap-card[open] summary { border-radius: 8px 8px 0 0; }
 <!-- SCREEN 3: RESULTS -->
 <div id="screen-results" class="screen">
   <!-- Sticky header -->
-  <div style="background:var(--midnight-card);border-bottom:1px solid var(--midnight-border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;" class="no-print">
+  <div style="background:white;border-bottom:1px solid var(--midnight-border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 1px 6px rgba(21,101,192,0.08);" class="no-print">
     <div style="display:flex;align-items:center;gap:12px;">
       <button onclick="showScreen('setup')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;">&#8592; New Assessment</button>
       <span style="color:var(--midnight-border);">|</span>
@@ -199,7 +211,7 @@ details.gap-card[open] summary { border-radius: 8px 8px 0 0; }
     <div id="alert-banners"></div>
 
     <!-- Tabs -->
-    <div style="border-bottom:1px solid var(--midnight-border);margin-bottom:24px;display:flex;gap:0;" class="no-print">
+    <div style="border-bottom:2px solid var(--midnight-border);margin-bottom:24px;display:flex;gap:0;background:white;border-radius:8px 8px 0 0;padding:0 8px;" class="no-print">
       <button class="tab-btn active" onclick="showTab('overview')" id="tab-overview">Overview</button>
       <button class="tab-btn" onclick="showTab('graph')" id="tab-graph">Graph</button>
       <button class="tab-btn" onclick="showTab('gaps')" id="tab-gaps">Gaps</button>
