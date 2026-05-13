@@ -237,22 +237,18 @@ details.gap-card[open] summary { border-radius: 8px 8px 0 0; border-bottom-color
         <!-- Row 1: View mode + search -->
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <div style="display:flex;background:var(--sky-pale);border:1px solid var(--midnight-border);border-radius:8px;overflow:hidden;flex-shrink:0;">
-            <button id="view-domain" onclick="setGraphMode('domain')" style="padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:var(--ocean);color:white;transition:all 0.2s;">Domain</button>
+            <button id="view-kg" onclick="setGraphMode('kg')" style="padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:var(--ocean);color:white;transition:all 0.2s;">Knowledge Graph</button>
             <button id="view-semantic" onclick="setGraphMode('semantic')" style="padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--ocean);transition:all 0.2s;">Semantic Similarity</button>
           </div>
-          <input type="text" id="graph-search" placeholder="Search nodes..." style="width:180px;padding:7px 12px;font-size:13px;" oninput="applyGraphFilters()">
+          <input type="text" id="graph-search" placeholder="Search nodes..." style="width:180px;padding:7px 12px;font-size:13px;" oninput="state.graphMode==='kg'?applyKGFilters():null">
           <span id="node-count" style="font-size:12px;color:var(--text-muted);white-space:nowrap;margin-left:auto;"></span>
         </div>
-        <!-- Row 2: Domain mode controls -->
-        <div id="domain-controls" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Domains:</span>
-          <div id="domain-chips" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
+        <!-- Row 2: KG mode controls -->
+        <div id="kg-controls" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Entity Types:</span>
+          <div id="kg-entity-chips" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
           <div style="display:flex;gap:5px;margin-left:auto;">
-            <button class="btn-secondary active" id="risk-all" onclick="setRiskFilter('all')">All</button>
-            <button class="btn-secondary" id="risk-gaps" onclick="setRiskFilter('gaps')">Gaps</button>
-            <button class="btn-secondary" id="risk-strong" onclick="setRiskFilter('strong')">Strong</button>
-            <button class="btn-secondary" onclick="expandAllDomains()">Expand All</button>
-            <button class="btn-secondary" onclick="collapseAllDomains()">Collapse All</button>
+            <button class="btn-secondary" onclick="kgResetView()" title="Reset view and clear selection">Reset View</button>
           </div>
         </div>
         <!-- Row 2: Semantic mode controls -->
@@ -684,14 +680,13 @@ const state = {
   d3Simulation: null,
   d3Zoom: null,
   d3Svg: null,
-  expandedDomains: new Set(),
   graphInitialised: false,
-  graphMode: 'domain',       // 'domain' | 'semantic'
+  graphMode: 'kg',           // 'kg' | 'semantic'
   simThreshold: 0.25,
   riskFilter: 'all',
   gapSort: 'confidence',
   searchText: '',
-  activeDomainFilters: new Set(DOMAINS.map(d => d.id)),
+  activeEntityTypes: new Set(['project','riskdomain','technology','govbody','standard','gaparea','action']),
   allQuestions: [],
   simMatrix: [],
   semSim: null,
@@ -714,8 +709,8 @@ function showTab(name) {
   if (name === 'graph') {
     setTimeout(() => {
       if (state.graphMode === 'semantic') { computeSimilarityMatrix(); initSemanticGraph(); }
-      else if (!state.graphInitialised) initGraph();
-      else applyGraphFilters();
+      else if (!state.graphInitialised) initKGGraph();
+      else applyKGFilters();
     }, 50);
   }
 }
@@ -738,7 +733,7 @@ async function startAssessment() {
   state.domainResults = {};
   state.gaps = [];
   state.graphInitialised = false;
-  state.expandedDomains.clear();
+  state.activeEntityTypes = new Set(['project','riskdomain','technology','govbody','standard','gaparea','action']);
   showScreen('analysis');
   buildSteps();
   await runDomains();
@@ -914,7 +909,6 @@ function renderResults() {
   renderGapsTab();
   renderRAITab();
   initRadar();
-  buildDomainChips();
 }
 
 function buildGaps() {
@@ -1226,15 +1220,15 @@ function initRadar() {
 // ============================================================
 function setGraphMode(mode) {
   state.graphMode = mode;
-  document.getElementById('view-domain').style.background = mode === 'domain' ? 'var(--ocean)' : 'transparent';
-  document.getElementById('view-domain').style.color = mode === 'domain' ? 'white' : 'var(--ocean)';
+  document.getElementById('view-kg').style.background = mode === 'kg' ? 'var(--ocean)' : 'transparent';
+  document.getElementById('view-kg').style.color = mode === 'kg' ? 'white' : 'var(--ocean)';
   document.getElementById('view-semantic').style.background = mode === 'semantic' ? 'var(--ocean)' : 'transparent';
   document.getElementById('view-semantic').style.color = mode === 'semantic' ? 'white' : 'var(--ocean)';
-  document.getElementById('domain-controls').style.display = mode === 'domain' ? 'flex' : 'none';
+  document.getElementById('kg-controls').style.display = mode === 'kg' ? 'flex' : 'none';
   document.getElementById('semantic-controls').style.display = mode === 'semantic' ? 'flex' : 'none';
-  if (mode === 'domain') {
+  if (mode === 'kg') {
     state.graphInitialised = false;
-    initGraph();
+    initKGGraph();
   } else {
     computeSimilarityMatrix();
     initSemanticGraph();
@@ -1244,10 +1238,8 @@ function setGraphMode(mode) {
 function updateThreshold(val) {
   state.simThreshold = parseFloat(val);
   document.getElementById('threshold-val').textContent = Math.round(val * 100) + '%';
-  if (state.graphMode === 'semantic') {
-    computeSimilarityMatrix();
-    initSemanticGraph();
-  }
+  computeSimilarityMatrix();
+  initSemanticGraph();
 }
 
 // ============================================================
@@ -1404,7 +1396,7 @@ function initSemanticGraph() {
       .on('end', (ev, d) => { if (!ev.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }))
     .on('click', (ev, d) => {
       ev.stopPropagation();
-      showNodeDetails(d);
+      showSemanticNodeDetails(d);
       highlightSemantic(d, nodes, links, simLinkEl, projLinkEl, nodeGroup);
     });
 
@@ -1469,279 +1461,469 @@ function resetHighlight(simLinkEl, projLinkEl, nodeGroup) {
     .attr('stroke-width', d => d.type === 'project' ? 3 : 1);
 }
 
-// ============================================================
-// D3 FORCE GRAPH
-// ============================================================
-function buildDomainChips() {
-  const container = document.getElementById('domain-chips');
-  container.innerHTML = '';
-  DOMAINS.forEach(d => {
-    const chip = document.createElement('div');
-    chip.className = 'chip active';
-    chip.id = 'chip-' + d.id;
-    chip.style.borderColor = d.color + '55';
-    chip.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${d.color};display:inline-block;"></span>${d.label.split(' ')[0]}`;
-    chip.onclick = () => toggleDomainFilter(d.id);
-    container.appendChild(chip);
-  });
-}
-
-function toggleDomainFilter(domainId) {
-  if (state.activeDomainFilters.has(domainId)) state.activeDomainFilters.delete(domainId);
-  else state.activeDomainFilters.add(domainId);
-  const chip = document.getElementById('chip-' + domainId);
-  if (chip) chip.classList.toggle('active', state.activeDomainFilters.has(domainId));
-  applyGraphFilters();
-}
-
-function setRiskFilter(mode) {
-  state.riskFilter = mode;
-  ['all', 'gaps', 'strong'].forEach(m => {
-    const btn = document.getElementById('risk-' + m);
-    if (btn) btn.classList.toggle('active', m === mode);
-  });
-  applyGraphFilters();
-}
-
-let gNodes = [], gLinks = [], gSvg, gSim, gZoom;
-
-function initGraph() {
-  state.graphInitialised = true;
-  const container = document.getElementById('d3-graph-container');
-  const W = container.clientWidth || 820;
-  const H = 580;
-  d3.select('#graph-svg').selectAll('*').remove();
-  gSvg = d3.select('#graph-svg').attr('width', W).attr('height', H);
-  const g = gSvg.append('g').attr('id', 'graph-g');
-  gZoom = d3.zoom().scaleExtent([0.3, 3]).on('zoom', (event) => g.attr('transform', event.transform));
-  gSvg.call(gZoom);
-  // Build nodes
-  gNodes = [{ id: 'project', type: 'project', label: state.projectName, radius: 28, color: '#FFC107', domain: null }];
-  gLinks = [];
-  DOMAINS.forEach(domain => {
-    const domNode = { id: 'domain-' + domain.id, type: 'domain', label: domain.label, radius: 20, color: domain.color, domain: domain.id, expanded: false };
-    gNodes.push(domNode);
-    gLinks.push({ source: 'project', target: 'domain-' + domain.id, type: 'project-domain', color: 'rgba(255,255,255,0.3)', distance: 140 });
-    const results = state.domainResults[domain.id] || [];
-    domain.questions.forEach((q, idx) => {
-      const conf = results[idx] ? results[idx].confidence : 0.3;
-      const qColor = conf >= 0.8 ? '#00A651' : conf >= 0.5 ? '#FFC107' : '#F26522';
-      gNodes.push({
-        id: `q-${domain.id}-${idx}`, type: 'question', label: q, radius: 8, color: qColor,
-        domain: domain.id, confidence: conf,
-        evidence: results[idx] ? results[idx].evidence : '',
-        gap: results[idx] ? results[idx].gap : '',
-        controls: results[idx] ? results[idx].controls : [],
-        standards: results[idx] ? results[idx].standards : [],
-        visible: false
-      });
-      gLinks.push({ source: 'domain-' + domain.id, target: `q-${domain.id}-${idx}`, type: 'domain-question', color: domain.color + '99', distance: 60 });
-    });
-  });
-  const nodeMap = {};
-  gNodes.forEach(n => nodeMap[n.id] = n);
-  gLinks.forEach(l => { l.source = nodeMap[l.source] || l.source; l.target = nodeMap[l.target] || l.target; });
-  const visLinks = gLinks.filter(l => l.type === 'project-domain');
-  const visNodes = gNodes.filter(n => n.type !== 'question');
-  gSim = d3.forceSimulation(visNodes)
-    .force('link', d3.forceLink(visLinks).id(d => d.id).distance(d => d.distance || 140).strength(0.7))
-    .force('charge', d3.forceManyBody().strength(-250))
-    .force('center', d3.forceCenter(W / 2, H / 2))
-    .force('collide', d3.forceCollide(d => d.radius + 20));
-  state.d3Simulation = gSim;
-  state.d3Zoom = gZoom;
-  state.d3Svg = gSvg;
-  renderGraph(g, visNodes, visLinks, W, H);
-  updateNodeCount();
-}
-
-function renderGraph(g, visNodes, visLinks, W, H) {
-  g.selectAll('.link').remove();
-  g.selectAll('.node-group').remove();
-  const link = g.selectAll('.link').data(visLinks).enter().append('line')
-    .attr('class', 'link').attr('stroke', d => d.color || 'rgba(255,255,255,0.3)')
-    .attr('stroke-width', 1.5).attr('stroke-opacity', 0.5);
-  const nodeGroup = g.selectAll('.node-group').data(visNodes).enter().append('g')
-    .attr('class', 'node-group').attr('cursor', 'pointer')
-    .call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended))
-    .on('click', (event, d) => { event.stopPropagation(); handleNodeClick(d); });
-  nodeGroup.append('circle')
-    .attr('r', d => d.radius)
-    .attr('fill', d => d.color)
-    .attr('fill-opacity', d => d.type === 'question' ? 0.85 : 0.95)
-    .attr('stroke', d => d.type === 'project' ? '#FFE082' : d.type === 'domain' ? 'rgba(255,255,255,0.3)' : 'none')
-    .attr('stroke-width', d => d.type === 'project' ? 3 : 1.5);
-  nodeGroup.filter(d => d.type !== 'question').append('text')
-    .attr('text-anchor', 'middle').attr('dy', d => d.type === 'project' ? '0.35em' : d.radius + 14)
-    .attr('font-size', d => d.type === 'project' ? '11px' : '10px')
-    .attr('font-weight', '600').attr('fill', '#E8F4FF')
-    .attr('pointer-events', 'none')
-    .text(d => d.label.length > 14 ? d.label.substring(0, 13) + '…' : d.label);
-  gSim.on('tick', () => {
-    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-    nodeGroup.attr('transform', d => `translate(${d.x},${d.y})`);
-  });
-}
-
-function handleNodeClick(d) {
-  if (d.type === 'domain') toggleDomainExpand(d.domain);
-  showNodeDetails(d);
-}
-
-function toggleDomainExpand(domainId) {
-  const isExpanded = state.expandedDomains.has(domainId);
-  if (isExpanded) { state.expandedDomains.delete(domainId); collapseOne(domainId); }
-  else { state.expandedDomains.add(domainId); expandOne(domainId); }
-  updateNodeCount();
-}
-
-function expandOne(domainId) {
-  const g = d3.select('#graph-g');
-  const domainNode = gNodes.find(n => n.id === 'domain-' + domainId);
-  const qNodes = gNodes.filter(n => n.type === 'question' && n.domain === domainId);
-  const qLinks = gLinks.filter(l => l.type === 'domain-question' && l.source.domain === domainId);
-  qNodes.forEach(n => {
-    n.visible = true; n.x = domainNode.x + (Math.random() - 0.5) * 60; n.y = domainNode.y + (Math.random() - 0.5) * 60;
-  });
-  const allVis = gNodes.filter(n => n.type !== 'question' || n.visible);
-  const allVisLinks = gLinks.filter(l => l.type === 'project-domain' || (l.type === 'domain-question' && (l.source.visible !== false) && state.expandedDomains.has(l.source.domain)));
-  gSim.nodes(allVis);
-  gSim.force('link').links(allVisLinks);
-  gSim.alpha(0.3).restart();
-  renderGraph(g, allVis, allVisLinks, parseInt(gSvg.attr('width')), parseInt(gSvg.attr('height')));
-  applyGraphFilters();
-}
-
-function collapseOne(domainId) {
-  const qNodes = gNodes.filter(n => n.type === 'question' && n.domain === domainId);
-  qNodes.forEach(n => { n.visible = false; });
-  const allVis = gNodes.filter(n => n.type !== 'question' || n.visible);
-  const allVisLinks = gLinks.filter(l => l.type === 'project-domain' || (l.type === 'domain-question' && state.expandedDomains.has(l.source.domain)));
-  const g = d3.select('#graph-g');
-  gSim.nodes(allVis);
-  gSim.force('link').links(allVisLinks);
-  gSim.alpha(0.3).restart();
-  renderGraph(g, allVis, allVisLinks, parseInt(gSvg.attr('width')), parseInt(gSvg.attr('height')));
-  applyGraphFilters();
-}
-
-function expandAllDomains() {
-  DOMAINS.forEach(d => { if (!state.expandedDomains.has(d.id)) { state.expandedDomains.add(d.id); gNodes.filter(n => n.type === 'question' && n.domain === d.id).forEach(n => n.visible = true); } });
-  rebuildGraphFull();
-}
-
-function collapseAllDomains() {
-  state.expandedDomains.clear();
-  gNodes.filter(n => n.type === 'question').forEach(n => n.visible = false);
-  rebuildGraphFull();
-}
-
-function rebuildGraphFull() {
-  const g = d3.select('#graph-g');
-  const allVis = gNodes.filter(n => n.type !== 'question' || n.visible);
-  const allVisLinks = gLinks.filter(l => l.type === 'project-domain' || (l.type === 'domain-question' && state.expandedDomains.has(l.source.domain)));
-  gSim.nodes(allVis);
-  gSim.force('link').links(allVisLinks);
-  gSim.alpha(0.5).restart();
-  renderGraph(g, allVis, allVisLinks, parseInt(gSvg.attr('width')), parseInt(gSvg.attr('height')));
-  applyGraphFilters();
-  updateNodeCount();
-}
-
-function applyGraphFilters() {
-  if (!state.graphInitialised) return;
-  const search = (document.getElementById('graph-search') || {}).value || '';
-  state.searchText = search.toLowerCase();
-  const riskFilter = state.riskFilter;
-  d3.selectAll('.node-group').each(function(d) {
-    if (!d) return;
-    let visible = true;
-    if (d.type === 'domain' && !state.activeDomainFilters.has(d.domain)) visible = false;
-    if (d.type === 'question' && !state.activeDomainFilters.has(d.domain)) visible = false;
-    if (riskFilter === 'gaps' && d.type === 'question' && d.confidence >= 0.5) visible = false;
-    if (riskFilter === 'strong' && d.type === 'question' && d.confidence < 0.8) visible = false;
-    if (state.searchText && !d.label.toLowerCase().includes(state.searchText) && d.type !== 'project') visible = false;
-    d3.select(this).attr('opacity', visible ? 1 : 0.15);
-  });
-  updateNodeCount();
-}
-
-function updateNodeCount() {
-  const el = document.getElementById('node-count');
-  if (!el) return;
-  const vis = gNodes.filter(n => n.type !== 'question' || n.visible).length;
-  el.textContent = vis + ' nodes shown';
-}
-
-function showNodeDetails(d) {
+// Semantic graph node details panel
+function showSemanticNodeDetails(d) {
   document.getElementById('node-details-empty').style.display = 'none';
   const content = document.getElementById('node-details-content');
   content.style.display = 'block';
-  const typeLabels = { project: 'Project', domain: 'Domain', question: 'Question' };
-  const typeColors = { project: 'var(--sun)', domain: d.color, question: d.color };
   const confPct = d.confidence !== undefined ? Math.round(d.confidence * 100) : null;
   const confColor = d.confidence >= 0.8 ? '#00A651' : d.confidence >= 0.5 ? '#FFC107' : '#F26522';
+  const typeColor = d.type === 'project' ? 'var(--sun)' : d.color;
   let html = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-      <span style="background:${typeColors[d.type] || 'var(--sky)'};color:#000;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;">${typeLabels[d.type] || d.type}</span>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <span style="background:${typeColor};color:${d.type==='project'?'#000':'white'};padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;">${d.type === 'project' ? 'Project' : escHtml(d.domainLabel)}</span>
     </div>
-    <div style="font-size:13px;font-weight:700;color:var(--text-primary);line-height:1.5;margin-bottom:12px;">${escHtml(d.label)}</div>
+    <div style="font-size:13px;font-weight:700;color:var(--text-primary);line-height:1.5;margin-bottom:10px;">${escHtml(d.label.substring(0, 120))}${d.label.length > 120 ? '…' : ''}</div>
   `;
-  if (d.domain) {
-    const dom = DOMAINS.find(x => x.id === d.domain);
-    if (dom) html += `<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;"><span style="width:8px;height:8px;border-radius:50%;background:${dom.color};display:inline-block;margin-right:5px;"></span>${dom.label}</div>`;
+  if (confPct !== null && d.type !== 'project') {
+    html += `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Coverage</div>
+      <div style="display:flex;align-items:center;gap:8px;"><div class="conf-bar" style="flex:1;"><div class="conf-fill" style="width:${confPct}%;background:${confColor};"></div></div>
+      <span style="font-size:13px;font-weight:700;color:${confColor};">${confPct}%</span></div></div>`;
   }
-  if (confPct !== null) {
-    html += `<div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Confidence</div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="conf-bar" style="flex:1;"><div class="conf-fill" style="width:${confPct}%;background:${confColor};"></div></div>
-        <span style="font-size:13px;font-weight:700;color:${confColor};">${confPct}%</span>
-      </div>
-    </div>`;
-  }
-  if (d.evidence) html += `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">Evidence</div><p style="font-size:12px;line-height:1.5;margin:0;color:var(--text-primary);">${escHtml(d.evidence)}</p></div>`;
-  if (d.gap) html += `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">Gap</div><p style="font-size:12px;line-height:1.5;margin:0;color:var(--text-primary);">${escHtml(d.gap)}</p></div>`;
-  // Semantic similarity section (only in semantic mode)
-  if (state.graphMode === 'semantic' && d.type === 'question' && state.allQuestions.length) {
-    const projSim = typeof d.projSimilarity === 'number' ? d.projSimilarity : 0;
-    const projSimColor = projSim >= 0.5 ? '#00A651' : projSim >= 0.3 ? '#FFC107' : '#F26522';
-    html += `<div style="margin-bottom:12px;padding:10px;background:var(--sky-pale);border-radius:8px;border:1px solid var(--midnight-border);">
-      <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Semantic Similarity to Project</div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="conf-bar" style="flex:1;"><div class="conf-fill" style="width:${Math.round(projSim*100)}%;background:${projSimColor};"></div></div>
-        <span style="font-size:13px;font-weight:700;color:${projSimColor};">${Math.round(projSim * 100)}%</span>
-      </div>
-    </div>`;
-    // Top 3 most similar other questions
+  if (d.type === 'question' && typeof d.projSimilarity === 'number') {
+    const ps = Math.round(d.projSimilarity * 100);
+    const psColor = d.projSimilarity >= 0.5 ? '#00A651' : d.projSimilarity >= 0.3 ? '#FFC107' : '#F26522';
+    html += `<div style="margin-bottom:10px;padding:9px;background:var(--sky-pale);border-radius:8px;border:1px solid var(--midnight-border);">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.06em;">Semantic Similarity to Project</div>
+      <div style="display:flex;align-items:center;gap:8px;"><div class="conf-bar" style="flex:1;"><div class="conf-fill" style="width:${ps}%;background:${psColor};"></div></div>
+      <span style="font-size:13px;font-weight:700;color:${psColor};">${ps}%</span></div></div>`;
     const qi = state.allQuestions.findIndex(q => q.id === d.id);
     if (qi >= 0 && state.simMatrix.M) {
       const sims = state.allQuestions.map((q, j) => ({ q, s: j === qi ? -1 : getSim(qi, j) }))
         .filter(x => x.s > 0.15).sort((a, b) => b.s - a.s).slice(0, 4);
       if (sims.length) {
-        html += `<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Most Similar Criteria</div>`;
+        html += `<div style="margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.06em;">Most Similar Criteria</div>`;
         sims.forEach(({ q, s }) => {
           const sColor = s >= 0.4 ? 'var(--ocean)' : 'var(--text-muted)';
-          html += `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:7px;padding:6px 8px;background:white;border-radius:6px;border:1px solid var(--midnight-border);">
+          html += `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding:6px 8px;background:white;border-radius:6px;border:1px solid var(--midnight-border);">
             <div style="width:8px;height:8px;border-radius:50%;background:${q.domain.color};flex-shrink:0;margin-top:4px;"></div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:11px;font-weight:600;color:var(--text-muted);">${escHtml(q.domain.label)}</div>
-              <div style="font-size:11px;color:var(--text-primary);line-height:1.4;">${escHtml(q.text.substring(0, 70))}${q.text.length > 70 ? '…' : ''}</div>
-            </div>
-            <span style="font-size:11px;font-weight:700;color:${sColor};flex-shrink:0;">${Math.round(s * 100)}%</span>
-          </div>`;
+            <div style="flex:1;min-width:0;"><div style="font-size:10px;color:var(--text-muted);">${escHtml(q.domain.label)}</div>
+            <div style="font-size:11px;color:var(--text-primary);line-height:1.4;">${escHtml(q.text.substring(0, 70))}${q.text.length > 70 ? '…' : ''}</div></div>
+            <span style="font-size:11px;font-weight:700;color:${sColor};flex-shrink:0;">${Math.round(s * 100)}%</span></div>`;
         });
         html += `</div>`;
       }
     }
   }
+  if (d.evidence) html += `<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Evidence</div><p style="font-size:12px;line-height:1.5;margin:0;color:var(--text-primary);">${escHtml(d.evidence)}</p></div>`;
+  if (d.gap) html += `<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Gap</div><p style="font-size:12px;line-height:1.5;margin:0;color:var(--text-primary);">${escHtml(d.gap)}</p></div>`;
   if (d.controls && d.controls.length) {
-    html += `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">Controls</div><ul style="margin:0;padding-left:14px;font-size:12px;line-height:1.7;color:var(--text-primary);">${d.controls.map(c => `<li>${escHtml(c)}</li>`).join('')}</ul></div>`;
+    html += `<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Controls</div><ul style="margin:0;padding-left:14px;font-size:12px;line-height:1.7;color:var(--text-primary);">${d.controls.map(c => `<li>${escHtml(c)}</li>`).join('')}</ul></div>`;
   }
   if (d.standards && d.standards.length) {
-    html += `<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Standards</div>${d.standards.map(s => `<span style="background:rgba(21,101,192,0.1);color:var(--ocean);border:1px solid rgba(21,101,192,0.2);padding:2px 8px;border-radius:10px;font-size:11px;margin-right:3px;margin-bottom:3px;display:inline-block;">${escHtml(s)}</span>`).join('')}</div>`;
+    html += `<div>${d.standards.map(s => `<span style="background:rgba(21,101,192,0.1);color:var(--ocean);border:1px solid rgba(21,101,192,0.2);padding:2px 8px;border-radius:10px;font-size:11px;margin-right:3px;margin-bottom:3px;display:inline-block;">${escHtml(s)}</span>`).join('')}</div>`;
   }
+  content.innerHTML = html;
+}
+
+// ============================================================
+// ADM-STYLE KNOWLEDGE GRAPH
+// ============================================================
+const KG_ENTITY_TYPES = [
+  { id: 'project',    label: 'Project',          color: '#1565C0' },
+  { id: 'riskdomain', label: 'Risk Domain',       color: '#42A5F5' },
+  { id: 'technology', label: 'Technology',        color: '#0E7490' },
+  { id: 'govbody',    label: 'Governance Body',   color: '#FF6720' },
+  { id: 'standard',   label: 'Standard',          color: '#7B1FA2' },
+  { id: 'gaparea',    label: 'Gap Area',          color: '#EF4444' },
+  { id: 'action',     label: 'Required Action',   color: '#00A651' },
+];
+
+const KG_NODE_BASE_RADIUS = {
+  project: 24, riskdomain: 16, technology: 12, govbody: 12,
+  standard: 8, gaparea: 10, action: 10,
+};
+
+const TECH_PATTERNS_KG = [
+  ['Generative AI',   /gen\s?ai|generative\s+ai|llm|large\s+language|gpt|chatgpt|copilot/i],
+  ['Computer Vision', /computer\s+vision|image\s+recogni|video\s+analytic|cctv|facial\s+recogni|object\s+detect/i],
+  ['NLP',             /\bnlp\b|natural\s+language|text\s+analytic|sentiment\s+analys|speech\s+recogni/i],
+  ['AI/ML',           /\bai\b|machine\s+learning|\bml\b|artificial\s+intelligence|predictive\s+model|neural\s+net|deep\s+learning/i],
+  ['Automation',      /\brpa\b|robotic\s+process|automat(?:ed|ion)|decision\s+engine|rules\s+engine/i],
+  ['Analytics',       /analytic|data\s+science|statistical\s+model|dashboar|reporting/i],
+];
+
+function kgSlug(s) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 60);
+}
+
+function buildKGData() {
+  const nodesMap = {};
+  const edges = [];
+  const edgeSet = new Set();
+
+  function addNode(id, type, label, data) {
+    if (!nodesMap[id]) nodesMap[id] = { id, type, label, data: data || {} };
+  }
+  function addEdge(src, tgt, type) {
+    const key = src + '|' + tgt + '|' + type;
+    if (!edgeSet.has(key)) { edgeSet.add(key); edges.push({ source: src, target: tgt, type }); }
+  }
+
+  const projId = 'proj-' + kgSlug(state.projectName);
+  addNode(projId, 'project', state.projectName, { description: state.projectDesc });
+
+  // Technologies detected from description + assessment evidence
+  let allText = state.projectName + ' ' + state.projectDesc;
+  Object.values(state.domainResults).forEach(results => {
+    results.forEach(r => { if (r && r.evidence) allText += ' ' + r.evidence; });
+  });
+  TECH_PATTERNS_KG.forEach(([label, pattern]) => {
+    if (pattern.test(allText)) {
+      const techId = 'tech-' + kgSlug(label);
+      addNode(techId, 'technology', label);
+      addEdge(projId, techId, 'EMPLOYS_TECH');
+    }
+  });
+
+  // Risk domains, governance bodies, actions, gaps, standards
+  DOMAINS.forEach(domain => {
+    const results = state.domainResults[domain.id] || [];
+    const avgConf = results.length
+      ? results.reduce((s, r) => s + (r && r.confidence ? r.confidence : 0), 0) / results.length
+      : 0.3;
+
+    const domId = 'dom-' + domain.id;
+    addNode(domId, 'riskdomain', domain.label, { color: domain.color, avgConf });
+    addEdge(projId, domId, 'ASSESSED_AGAINST');
+
+    // Governance body
+    const govAction = DOMAIN_GOVERNANCE_ACTIONS[domain.id];
+    if (govAction) {
+      const contactShort = govAction.contact.split('—')[0].split('–')[0].split(' — ')[0].trim();
+      const govId = 'gov-' + kgSlug(contactShort);
+      addNode(govId, 'govbody', contactShort);
+      addEdge(domId, govId, 'GOVERNED_BY');
+
+      // Required action node when there are gaps
+      if (avgConf < 0.75) {
+        const actId = 'act-' + kgSlug(govAction.action.substring(0, 40));
+        addNode(actId, 'action', govAction.action, { urgency: govAction.urgency, domainId: domain.id });
+        addEdge(domId, actId, 'REQUIRES_ACTION');
+      }
+    }
+
+    // Gap area node for domains with significant gaps
+    if (avgConf < 0.5 && results.length > 0) {
+      const gapCount = results.filter(r => r && (r.confidence || 0) < 0.5).length;
+      const gapId = 'gap-' + domain.id;
+      addNode(gapId, 'gaparea', domain.label + ' Gaps', { count: gapCount, avgConf, domainColor: domain.color });
+      addEdge(domId, gapId, 'HAS_GAP');
+    }
+
+    // Standards mentioned in assessment results for this domain
+    const domainStandards = new Set();
+    results.forEach(r => { if (r && r.standards) r.standards.forEach(s => { if (s && s.trim()) domainStandards.add(s.trim()); }); });
+    domainStandards.forEach(std => {
+      const stdId = 'std-' + kgSlug(std);
+      addNode(stdId, 'standard', std);
+      addEdge(stdId, domId, 'APPLIES_TO');
+    });
+  });
+
+  return { nodes: Object.values(nodesMap), edges };
+}
+
+function buildKGAdjacency(nodes, edges) {
+  const adj = {};
+  nodes.forEach(n => { adj[n.id] = []; });
+  edges.forEach(e => {
+    const s = typeof e.source === 'object' ? e.source.id : e.source;
+    const t = typeof e.target === 'object' ? e.target.id : e.target;
+    if (adj[s]) adj[s].push({ id: t, type: e.type, dir: 'out' });
+    if (adj[t]) adj[t].push({ id: s, type: e.type, dir: 'in' });
+  });
+  return adj;
+}
+
+function getKGSubgraph(nodeId, hops, adjacency) {
+  const visited = new Set([nodeId]);
+  let frontier = [nodeId];
+  for (let h = 0; h < hops; h++) {
+    const next = [];
+    frontier.forEach(id => {
+      (adjacency[id] || []).forEach(nb => {
+        if (!visited.has(nb.id)) { visited.add(nb.id); next.push(nb.id); }
+      });
+    });
+    frontier = next;
+  }
+  return visited;
+}
+
+function kgNodeColor(d) {
+  if (d.type === 'riskdomain') return d.data && d.data.color ? d.data.color : '#42A5F5';
+  if (d.type === 'gaparea') return d.data && d.data.avgConf < 0.3 ? '#EF4444' : '#F97316';
+  const et = KG_ENTITY_TYPES.find(e => e.id === d.type);
+  return et ? et.color : '#888';
+}
+
+function kgNodeRadius(type, degree) {
+  return (KG_NODE_BASE_RADIUS[type] || 8) + Math.sqrt(Math.max(0, degree || 0)) * 2;
+}
+
+let gSvg, gSim, gZoom;
+let kgNodes = [], kgEdges = [], kgAdjacency = {}, kgSelectedNode = null;
+
+function initKGGraph() {
+  state.graphInitialised = true;
+  const graphData = buildKGData();
+  kgNodes = graphData.nodes;
+  kgEdges = graphData.edges;
+  kgAdjacency = buildKGAdjacency(kgNodes, kgEdges);
+
+  // Degree-based node sizing
+  const degreeMap = {};
+  kgNodes.forEach(n => { degreeMap[n.id] = 0; });
+  kgEdges.forEach(e => {
+    const s = typeof e.source === 'object' ? e.source.id : e.source;
+    const t = typeof e.target === 'object' ? e.target.id : e.target;
+    degreeMap[s] = (degreeMap[s] || 0) + 1;
+    degreeMap[t] = (degreeMap[t] || 0) + 1;
+  });
+  kgNodes.forEach(n => { n.degree = degreeMap[n.id] || 0; n.radius = kgNodeRadius(n.type, n.degree); });
+
+  const container = document.getElementById('d3-graph-container');
+  const W = container.clientWidth || 820;
+  const H = 580;
+
+  if (gSim) { gSim.stop(); gSim = null; }
+  d3.select('#graph-svg').selectAll('*').remove();
+  gSvg = d3.select('#graph-svg').attr('width', W).attr('height', H);
+  const g = gSvg.append('g').attr('id', 'graph-g');
+  gZoom = d3.zoom().scaleExtent([0.2, 4]).on('zoom', ev => g.attr('transform', ev.transform));
+  gSvg.call(gZoom);
+  gSvg.on('click.bg', () => { kgSelectedNode = null; renderKGHighlight(); showKGNodeDetails(null); });
+
+  // Resolve string refs to node objects
+  const nodeMap = Object.fromEntries(kgNodes.map(n => [n.id, n]));
+  kgEdges.forEach(e => {
+    if (typeof e.source === 'string') e.source = nodeMap[e.source] || e.source;
+    if (typeof e.target === 'string') e.target = nodeMap[e.target] || e.target;
+  });
+
+  gSim = d3.forceSimulation(kgNodes)
+    .force('link', d3.forceLink(kgEdges).id(d => d.id)
+      .distance(e => {
+        const st = typeof e.source === 'object' ? e.source.type : '';
+        const tt = typeof e.target === 'object' ? e.target.type : '';
+        if (st === 'project' || tt === 'project') return 170;
+        if (st === 'riskdomain' || tt === 'riskdomain') return 110;
+        return 75;
+      }).strength(0.5))
+    .force('charge', d3.forceManyBody().strength(d =>
+      d.type === 'project' ? -700 : d.type === 'riskdomain' ? -250 : -100))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collide', d3.forceCollide(d => d.radius + 6).strength(0.8));
+
+  renderKGGraph(g);
+  renderKGEntityChips();
+  updateNodeCount();
+
+  state.d3Simulation = gSim;
+  state.d3Svg = gSvg;
+  state.d3Zoom = gZoom;
+}
+
+function renderKGGraph(g) {
+  g.selectAll('.kg-link').remove();
+  g.selectAll('.kg-node').remove();
+
+  const link = g.selectAll('.kg-link').data(kgEdges).enter().append('line')
+    .attr('class', 'kg-link')
+    .attr('stroke', e => {
+      if (e.type === 'EMPLOYS_TECH') return '#0E7490';
+      if (e.type === 'HAS_GAP') return '#EF4444';
+      if (e.type === 'REQUIRES_ACTION') return '#00A651';
+      if (e.type === 'GOVERNED_BY') return '#FF6720';
+      if (e.type === 'APPLIES_TO') return '#7B1FA2';
+      return '#94a3b8';
+    })
+    .attr('stroke-width', e => e.type === 'ASSESSED_AGAINST' ? 1 : 1.5)
+    .attr('stroke-opacity', 0.5)
+    .attr('stroke-dasharray', e => e.type === 'ASSESSED_AGAINST' ? '4,3' : null);
+
+  const nodeGroup = g.selectAll('.kg-node').data(kgNodes).enter().append('g')
+    .attr('class', 'kg-node').attr('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', (ev, d) => { if (!ev.active) gSim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+      .on('end',   (ev, d) => { if (!ev.active) gSim.alphaTarget(0); d.fx = null; d.fy = null; }))
+    .on('click', (ev, d) => {
+      ev.stopPropagation();
+      kgSelectedNode = kgSelectedNode && kgSelectedNode.id === d.id ? null : d;
+      renderKGHighlight();
+      showKGNodeDetails(kgSelectedNode);
+    });
+
+  nodeGroup.append('circle')
+    .attr('r', d => d.radius)
+    .attr('fill', d => kgNodeColor(d))
+    .attr('fill-opacity', 0.9)
+    .attr('stroke', d => d.type === 'project' ? '#FFE082' : 'rgba(255,255,255,0.25)')
+    .attr('stroke-width', d => d.type === 'project' ? 3 : 1.5);
+
+  // Coverage ring on risk domain nodes
+  nodeGroup.filter(d => d.type === 'riskdomain' && d.data && d.data.avgConf !== undefined)
+    .append('circle')
+    .attr('r', d => d.radius + 4)
+    .attr('fill', 'none')
+    .attr('stroke', d => d.data.avgConf >= 0.7 ? '#00A651' : d.data.avgConf >= 0.4 ? '#F9A825' : '#EF4444')
+    .attr('stroke-width', 2.5)
+    .attr('stroke-opacity', 0.65);
+
+  nodeGroup.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dy', d => d.radius + 13)
+    .attr('font-size', d => d.type === 'project' ? '11px' : '10px')
+    .attr('font-weight', '600')
+    .attr('fill', '#1e293b')
+    .attr('pointer-events', 'none')
+    .text(d => {
+      const max = d.type === 'project' ? 18 : 13;
+      return d.label.length > max ? d.label.substring(0, max - 1) + '…' : d.label;
+    });
+
+  gSim.on('tick', () => {
+    link.attr('x1', d => d.source.x || 0).attr('y1', d => d.source.y || 0)
+        .attr('x2', d => d.target.x || 0).attr('y2', d => d.target.y || 0);
+    nodeGroup.attr('transform', d => `translate(${d.x || 0},${d.y || 0})`);
+  });
+}
+
+function renderKGHighlight() {
+  if (!kgSelectedNode) {
+    d3.selectAll('.kg-node').attr('opacity', 1);
+    d3.selectAll('.kg-link').attr('opacity', 0.5);
+    return;
+  }
+  const sub = getKGSubgraph(kgSelectedNode.id, 2, kgAdjacency);
+  d3.selectAll('.kg-node').attr('opacity', d => sub.has(d.id) ? 1 : 0.08);
+  d3.selectAll('.kg-link').attr('opacity', e => {
+    const s = typeof e.source === 'object' ? e.source.id : e.source;
+    const t = typeof e.target === 'object' ? e.target.id : e.target;
+    return sub.has(s) && sub.has(t) ? 0.75 : 0.04;
+  });
+}
+
+function renderKGEntityChips() {
+  const container = document.getElementById('kg-entity-chips');
+  if (!container) return;
+  container.innerHTML = '';
+  const present = new Set(kgNodes.map(n => n.type));
+  KG_ENTITY_TYPES.forEach(et => {
+    if (!present.has(et.id)) return;
+    const count = kgNodes.filter(n => n.type === et.id).length;
+    const active = state.activeEntityTypes.has(et.id);
+    const color = et.id === 'riskdomain' ? '#42A5F5' : et.color;
+    const chip = document.createElement('button');
+    chip.style.cssText = `padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;cursor:pointer;border:2px solid ${color};background:${active ? color : 'transparent'};color:${active ? 'white' : color};transition:all 0.15s;`;
+    chip.textContent = et.label + ' (' + count + ')';
+    chip.onclick = () => {
+      if (state.activeEntityTypes.has(et.id)) state.activeEntityTypes.delete(et.id);
+      else state.activeEntityTypes.add(et.id);
+      applyKGFilters();
+      renderKGEntityChips();
+    };
+    container.appendChild(chip);
+  });
+}
+
+function applyKGFilters() {
+  if (!state.graphInitialised) return;
+  const search = ((document.getElementById('graph-search') || {}).value || '').toLowerCase();
+  state.searchText = search;
+  const active = state.activeEntityTypes;
+  d3.selectAll('.kg-node').attr('opacity', d => {
+    if (!d) return 0.05;
+    if (!active.has(d.type)) return 0.05;
+    if (search && !d.label.toLowerCase().includes(search) && d.type !== 'project') return 0.15;
+    return 1;
+  });
+  d3.selectAll('.kg-link').attr('opacity', e => {
+    if (!e) return 0.05;
+    const s = typeof e.source === 'object' ? e.source : { type: '' };
+    const t = typeof e.target === 'object' ? e.target : { type: '' };
+    return active.has(s.type) && active.has(t.type) ? 0.5 : 0.04;
+  });
+  updateNodeCount();
+}
+
+function kgResetView() {
+  kgSelectedNode = null;
+  renderKGHighlight();
+  showKGNodeDetails(null);
+  state.activeEntityTypes = new Set(KG_ENTITY_TYPES.map(e => e.id));
+  applyKGFilters();
+  renderKGEntityChips();
+  if (gSvg && gZoom) gSvg.transition().duration(400).call(gZoom.transform, d3.zoomIdentity);
+}
+
+function updateNodeCount() {
+  const el = document.getElementById('node-count');
+  if (!el) return;
+  if (state.graphMode === 'kg') {
+    el.textContent = kgNodes.length + ' nodes · ' + kgEdges.length + ' edges';
+  } else {
+    el.textContent = (state.allQuestions.length + 1) + ' nodes shown';
+  }
+}
+
+function showKGNodeDetails(d) {
+  const empty = document.getElementById('node-details-empty');
+  const content = document.getElementById('node-details-content');
+  if (!d) { empty.style.display = 'block'; content.style.display = 'none'; return; }
+  empty.style.display = 'none';
+  content.style.display = 'block';
+  const et = KG_ENTITY_TYPES.find(e => e.id === d.type);
+  const typeLabel = et ? et.label : d.type;
+  const color = kgNodeColor(d);
+  const neighbors = kgAdjacency[d.id] || [];
+  let html = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <span style="background:${color};color:white;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;">${escHtml(typeLabel)}</span>
+      <span style="font-size:11px;color:var(--text-muted);">Degree: ${d.degree || 0}</span>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--text-primary);line-height:1.5;margin-bottom:10px;">${escHtml(d.label)}</div>
+  `;
+  if (d.type === 'riskdomain' && d.data && d.data.avgConf !== undefined) {
+    const pct = Math.round(d.data.avgConf * 100);
+    const cc = d.data.avgConf >= 0.7 ? '#00A651' : d.data.avgConf >= 0.4 ? '#F9A825' : '#EF4444';
+    html += `<div style="margin-bottom:12px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Avg Coverage</div>
+      <div style="display:flex;align-items:center;gap:8px;"><div class="conf-bar" style="flex:1;"><div class="conf-fill" style="width:${pct}%;background:${cc};"></div></div>
+      <span style="font-size:13px;font-weight:700;color:${cc};">${pct}%</span></div></div>`;
+  }
+  if (d.data && d.data.description) {
+    const desc = d.data.description;
+    html += `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">Description</div><p style="font-size:12px;line-height:1.5;margin:0;color:var(--text-primary);">${escHtml(desc.substring(0, 200))}${desc.length > 200 ? '…' : ''}</p></div>`;
+  }
+  if (d.data && d.data.urgency) {
+    html += `<div style="margin-bottom:10px;padding:8px;background:#FFF3CD;border-radius:6px;border-left:3px solid #F9A825;"><div style="font-size:11px;font-weight:700;color:#856404;margin-bottom:2px;">URGENCY</div><div style="font-size:11px;color:#533F03;">${escHtml(d.data.urgency)}</div></div>`;
+  }
+  if (d.data && d.data.count) {
+    html += `<div style="margin-bottom:8px;font-size:12px;color:var(--text-muted);">${d.data.count} question(s) with gaps in this domain.</div>`;
+  }
+  // Connected nodes
+  if (neighbors.length) {
+    html += `<div style="margin-top:10px;"><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Connections (${neighbors.length})</div>`;
+    neighbors.slice(0, 7).forEach(nb => {
+      const nbNode = kgNodes.find(n => n.id === nb.id);
+      if (!nbNode) return;
+      const nbColor = kgNodeColor(nbNode);
+      const nbType = KG_ENTITY_TYPES.find(e => e.id === nbNode.type);
+      html += `<div style="display:flex;align-items:center;gap:7px;padding:5px 7px;margin-bottom:4px;background:var(--sky-pale);border-radius:6px;">
+        <div style="width:8px;height:8px;border-radius:50%;background:${nbColor};flex-shrink:0;"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:10px;color:var(--text-muted);">${nbType ? nbType.label : nbNode.type} · <em>${escHtml(nb.type)}</em></div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(nbNode.label)}</div>
+        </div>
+      </div>`;
+    });
+    if (neighbors.length > 7) html += `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:3px;">${neighbors.length - 7} more…</div>`;
+    html += `</div>`;
+  }
+  // Standards tooltip
+  html += `<div style="margin-top:10px;font-size:11px;color:var(--text-muted);font-style:italic;">Click background to deselect · 2-hop subgraph shown</div>`;
   content.innerHTML = html;
 }
 
