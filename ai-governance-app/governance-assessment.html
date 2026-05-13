@@ -3,330 +3,474 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Governance Assessment</title>
+<title>AI Governance Assessment — Woolworths Group</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
-  body { background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; }
-  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; }
-  .btn-primary { background: #6366f1; color: white; border-radius: 8px; padding: 10px 20px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-  .btn-primary:hover { background: #4f46e5; }
-  .btn-primary:disabled { background: #475569; cursor: not-allowed; }
-  .bar-bg { background: #334155; border-radius: 4px; height: 8px; }
-  .bar-fill { height: 8px; border-radius: 4px; transition: width 1s ease; }
-  .tag { font-size: 11px; padding: 2px 8px; border-radius: 9999px; font-weight: 500; }
-  details summary { cursor: pointer; list-style: none; }
-  details summary::-webkit-details-marker { display: none; }
-  .spinner { border: 3px solid #334155; border-top-color: #6366f1; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; display: inline-block; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .progress-step { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 14px; color: #94a3b8; }
-  .progress-step.done { color: #22c55e; }
-  .progress-step.active { color: #e2e8f0; }
-  .risk-critical { background: #450a0a; color: #fca5a5; }
-  .risk-high { background: #431407; color: #fdba74; }
-  .risk-medium { background: #422006; color: #fcd34d; }
-  .risk-low { background: #052e16; color: #86efac; }
+:root {
+  --ocean: #1565C0;
+  --ocean-light: #1976D2;
+  --ocean-dark: #0D47A1;
+  --sky: #42A5F5;
+  --sky-light: #90CAF9;
+  --sun: #FFC107;
+  --earth: #F26522;
+  --land: #00A651;
+  --berry: #7B1FA2;
+  --midnight: #0A1628;
+  --midnight-card: #0F2044;
+  --midnight-border: #1E3A6E;
+  --text-primary: #E8F4FF;
+  --text-muted: #7FA8CC;
+}
+* { box-sizing: border-box; }
+body { background: var(--midnight); color: var(--text-primary); font-family: 'Inter', system-ui, sans-serif; margin: 0; min-height: 100vh; }
+.screen { display: none; }
+.screen.active { display: block; }
+.card { background: var(--midnight-card); border: 1px solid var(--midnight-border); border-radius: 12px; }
+.btn-primary { background: var(--ocean); color: white; border: none; border-radius: 8px; padding: 12px 28px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.btn-primary:hover { background: var(--ocean-light); }
+.btn-secondary { background: transparent; color: var(--sky); border: 1px solid var(--midnight-border); border-radius: 8px; padding: 8px 18px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.btn-secondary:hover { border-color: var(--sky); background: rgba(66,165,245,0.1); }
+.btn-secondary.active { background: var(--ocean); color: white; border-color: var(--ocean); }
+input, textarea, select { background: rgba(255,255,255,0.05); border: 1px solid var(--midnight-border); border-radius: 8px; color: var(--text-primary); padding: 10px 14px; width: 100%; font-size: 15px; transition: border-color 0.2s; }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--sky); }
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+.tab-btn { background: transparent; color: var(--text-muted); border: none; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap; }
+.tab-btn.active { color: var(--sky); border-bottom-color: var(--sky); }
+.tab-btn:hover { color: var(--text-primary); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.progress-bar-bg { background: rgba(255,255,255,0.08); border-radius: 4px; height: 6px; width: 100%; }
+.progress-bar-fill { height: 6px; border-radius: 4px; background: var(--ocean); transition: width 0.4s ease; }
+.step-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.step-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; }
+.step-icon.pending { background: rgba(255,255,255,0.1); color: var(--text-muted); }
+.step-icon.running { background: var(--ocean); color: white; }
+.step-icon.done { background: var(--land); color: white; }
+.step-icon.error { background: var(--earth); color: white; }
+.spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.risk-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.risk-critical { background: rgba(123,31,162,0.25); color: #CE93D8; border: 1px solid rgba(123,31,162,0.5); }
+.risk-high { background: rgba(242,101,34,0.2); color: #FFAB76; border: 1px solid rgba(242,101,34,0.4); }
+.risk-medium { background: rgba(255,193,7,0.15); color: #FFD54F; border: 1px solid rgba(255,193,7,0.35); }
+.risk-low { background: rgba(0,166,81,0.15); color: #69F0AE; border: 1px solid rgba(0,166,81,0.35); }
+.coverage-badge { background: rgba(21,101,192,0.25); color: var(--sky-light); border: 1px solid rgba(21,101,192,0.5); display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+.alert-banner { border-radius: 8px; padding: 10px 16px; margin-bottom: 8px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.alert-critical { background: rgba(123,31,162,0.2); border: 1px solid rgba(123,31,162,0.5); color: #CE93D8; }
+.alert-high { background: rgba(242,101,34,0.15); border: 1px solid rgba(242,101,34,0.4); color: #FFAB76; }
+.domain-card { background: var(--midnight-card); border: 1px solid var(--midnight-border); border-radius: 10px; padding: 16px; transition: border-color 0.2s; }
+.domain-card:hover { border-color: var(--ocean-light); }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; background: rgba(255,255,255,0.07); color: var(--text-muted); }
+.chip.active { background: var(--ocean); color: white; border-color: var(--ocean); }
+.chip:hover { background: rgba(66,165,245,0.15); color: var(--sky); }
+details summary { cursor: pointer; list-style: none; }
+details summary::-webkit-details-marker { display: none; }
+details > summary::before { content: '▶'; margin-right: 8px; font-size: 10px; transition: transform 0.2s; display: inline-block; }
+details[open] > summary::before { transform: rotate(90deg); }
+.node-panel { background: var(--midnight-card); border-left: 1px solid var(--midnight-border); padding: 20px; width: 280px; flex-shrink: 0; overflow-y: auto; height: 580px; }
+.conf-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.conf-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.rai-factor { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; }
+.rai-triggered { background: rgba(242,101,34,0.12); border: 1px solid rgba(242,101,34,0.3); }
+.rai-mitigated { background: rgba(0,166,81,0.1); border: 1px solid rgba(0,166,81,0.3); }
+.pathway-step { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.pathway-step .dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--midnight-border); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--text-muted); background: var(--midnight-card); z-index: 1; }
+.pathway-step.current .dot { border-color: var(--sun); color: var(--sun); background: rgba(255,193,7,0.15); }
+.pathway-step .label { font-size: 10px; color: var(--text-muted); margin-top: 4px; text-align: center; }
+.pathway-step.current .label { color: var(--sun); font-weight: 700; }
+.pathway-connector { flex: 1; height: 2px; background: var(--midnight-border); margin-top: 15px; }
+#graph-svg { display: block; }
+#d3-graph-container { position: relative; background: var(--midnight); border-radius: 0 0 12px 12px; border: 1px solid var(--midnight-border); border-top: none; overflow: hidden; }
+.graph-controls { display: flex; gap: 8px; align-items: center; background: var(--midnight-card); border: 1px solid var(--midnight-border); border-radius: 12px 12px 0 0; padding: 12px 16px; flex-wrap: wrap; }
+.zoom-btn { width: 32px; height: 32px; background: rgba(255,255,255,0.07); border: 1px solid var(--midnight-border); border-radius: 6px; color: var(--text-primary); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+.zoom-btn:hover { background: rgba(255,255,255,0.14); }
+#node-details-empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 40px 16px; }
+.gap-card { margin-bottom: 8px; }
+.gap-card summary { padding: 12px 16px; display: flex; align-items: center; gap: 10px; background: var(--midnight-card); border: 1px solid var(--midnight-border); border-radius: 8px; }
+details.gap-card[open] summary { border-radius: 8px 8px 0 0; }
+.gap-card .gap-body { background: rgba(15,32,68,0.6); border: 1px solid var(--midnight-border); border-top: none; border-radius: 0 0 8px 8px; padding: 16px; }
+.dot-indicator { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; color: black; }
+  .card { border: 1px solid #ccc; }
+}
 </style>
 </head>
-<body class="min-h-screen">
+<body>
 
-<!-- SETUP SCREEN -->
-<div id="screen-setup" class="max-w-2xl mx-auto px-4 py-16">
-  <div class="text-center mb-10">
-    <div class="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 rounded-full px-4 py-1 text-indigo-400 text-sm mb-4">
-      AI Governance Assessment Tool
+<!-- SCREEN 1: SETUP -->
+<div id="screen-setup" class="screen active">
+  <!-- Hero Header -->
+  <div style="background: linear-gradient(135deg, var(--ocean-dark) 0%, var(--ocean) 60%, var(--sky) 100%); padding: 40px 0 48px;">
+    <div style="max-width: 900px; margin: 0 auto; padding: 0 24px;">
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+        <div style="width:48px;height:48px;background:rgba(255,255,255,0.15);border-radius:12px;display:flex;align-items:center;justify-content:center;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/><polyline points="2,7 12,12 22,7"/><polyline points="2,12 12,17 22,12"/><polyline points="2,17 12,22 22,17"/></svg>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;opacity:0.75;margin-bottom:2px;">Woolworths Group</div>
+          <div style="font-size:26px;font-weight:800;letter-spacing:-0.01em;">AI Governance Assessment</div>
+        </div>
+      </div>
+      <p style="font-size:15px;opacity:0.85;max-width:600px;line-height:1.6;">Evaluate your AI project against 10 governance domains, 130 questions, RAI risk scoring, and architectural review requirements — powered by Claude.</p>
     </div>
-    <h1 class="text-4xl font-bold text-white mb-3">Governance Gap Analysis</h1>
-    <p class="text-slate-400 text-lg">Analyse your AI project against 100+ governance questions across 10 risk domains</p>
   </div>
 
-  <div class="card p-6 space-y-5">
-    <div>
-      <label class="block text-sm font-medium text-slate-300 mb-2">Anthropic API Key <span class="text-red-400">*</span></label>
-      <input id="api-key" type="password" placeholder="sk-ant-..." class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
-      <p class="text-xs text-slate-500 mt-1">Never stored — used only for this session in your browser. Get one at console.anthropic.com</p>
+  <!-- Info Cards -->
+  <div style="max-width:900px;margin:0 auto;padding:0 24px;">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:-28px;margin-bottom:32px;">
+      <div class="card" style="padding:16px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:var(--sky);">10</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Governance Domains</div>
+      </div>
+      <div class="card" style="padding:16px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:var(--sun);">130</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Questions Mapped</div>
+      </div>
+      <div class="card" style="padding:16px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:var(--land);">RAI</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Risk Scorecard</div>
+      </div>
+      <div class="card" style="padding:16px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:var(--earth);">D3</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Graph Analysis</div>
+      </div>
     </div>
 
-    <div>
-      <label class="block text-sm font-medium text-slate-300 mb-2">Project Name <span class="text-red-400">*</span></label>
-      <input id="project-name" type="text" placeholder="e.g. Customer Churn Prediction Model" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
-    </div>
-
-    <div>
-      <label class="block text-sm font-medium text-slate-300 mb-2">Project Description <span class="text-red-400">*</span></label>
-      <textarea id="project-desc" rows="8" placeholder="Paste your project proposal, technical design document, or description here. Include details about: what the AI does, what data it uses, who it affects, how decisions are made, and any third-party components..." class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
-      <p class="text-xs text-slate-500 mt-1">The more detail you provide, the more accurate the analysis</p>
-    </div>
-
-    <button id="btn-start" class="btn-primary w-full text-center py-3 text-base" onclick="startAssessment()">
-      Run Assessment →
-    </button>
-    <p id="setup-error" class="text-red-400 text-sm hidden"></p>
-  </div>
-
-  <div class="mt-8 grid grid-cols-2 gap-4 text-sm text-slate-400">
-    <div class="card p-4">
-      <div class="text-indigo-400 font-semibold mb-1">10 Risk Domains</div>
-      Privacy, Supplier, Agentic AI, Cyber, Ethics, Model Risk, Data Governance, Operational, Regulatory, ARB
-    </div>
-    <div class="card p-4">
-      <div class="text-indigo-400 font-semibold mb-1">Standards Mapped</div>
-      EU AI Act, ISO 42001, NIST AI RMF, CIS8, Australian Privacy Act
-    </div>
-    <div class="card p-4">
-      <div class="text-indigo-400 font-semibold mb-1">RAI Scorecard</div>
-      Numeric risk scoring with ADRB and AI Council thresholds
-    </div>
-    <div class="card p-4">
-      <div class="text-indigo-400 font-semibold mb-1">Gap Report</div>
-      Controls, governance patterns, and standards references per gap
+    <!-- Form -->
+    <div class="card" style="padding:32px;max-width:640px;margin:0 auto 48px;">
+      <h2 style="font-size:18px;font-weight:700;margin:0 0 24px;">Project Setup</h2>
+      <div style="margin-bottom:18px;">
+        <label style="font-size:13px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">Anthropic API Key <span style="font-weight:400;font-size:11px;color:var(--text-muted);">(never stored — in-browser only)</span></label>
+        <input type="password" id="api-key" placeholder="sk-ant-..." />
+      </div>
+      <div style="margin-bottom:18px;">
+        <label style="font-size:13px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">Project Name</label>
+        <input type="text" id="project-name" placeholder="e.g. Customer Churn Prediction" />
+      </div>
+      <div style="margin-bottom:28px;">
+        <label style="font-size:13px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">Project Description</label>
+        <textarea id="project-desc" rows="10" placeholder="Describe the AI system in detail: what it does, what data it uses, who it affects, deployment context, scale, autonomy level, integrations, and any known risks or constraints..."></textarea>
+      </div>
+      <div id="setup-error" style="display:none;background:rgba(242,101,34,0.15);border:1px solid rgba(242,101,34,0.4);border-radius:8px;padding:10px 14px;font-size:13px;color:#FFAB76;margin-bottom:16px;"></div>
+      <button class="btn-primary" onclick="startAssessment()" style="width:100%;font-size:16px;padding:14px;">Run Assessment &rarr;</button>
     </div>
   </div>
 </div>
 
-<!-- ANALYSIS SCREEN -->
-<div id="screen-analysis" class="max-w-2xl mx-auto px-4 py-16 hidden">
-  <div class="text-center mb-10">
-    <h2 class="text-2xl font-bold text-white mb-2">Analysing project…</h2>
-    <p class="text-slate-400">Claude is reviewing your project against all governance domains</p>
-  </div>
-  <div class="card p-8">
-    <div id="progress-steps" class="space-y-1"></div>
-    <div class="mt-6">
-      <div class="bar-bg">
-        <div id="progress-bar" class="bar-fill bg-indigo-500" style="width:0%"></div>
-      </div>
-      <p id="progress-label" class="text-xs text-slate-400 mt-2 text-right">0%</p>
+<!-- SCREEN 2: ANALYSIS -->
+<div id="screen-analysis" class="screen">
+  <div style="max-width:680px;margin:0 auto;padding:48px 24px;">
+    <div style="text-align:center;margin-bottom:40px;">
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;">Analysing your project...</div>
+      <p style="font-size:14px;color:var(--text-muted);">Evaluating 10 governance domains. Estimated time: 2–4 minutes.</p>
     </div>
+    <div class="card" style="padding:24px;margin-bottom:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:600;color:var(--text-muted);">Overall progress</span>
+        <span id="progress-pct" style="font-size:13px;font-weight:700;color:var(--sky);">0%</span>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+    <div class="card" style="padding:24px;" id="steps-container"></div>
   </div>
 </div>
 
-<!-- RESULTS SCREEN -->
-<div id="screen-results" class="max-w-5xl mx-auto px-4 py-10 hidden">
-
-  <!-- Header -->
-  <div class="flex flex-wrap items-start justify-between gap-4 mb-8">
-    <div>
-      <p class="text-slate-400 text-sm mb-1">AI Governance Assessment</p>
-      <h1 id="result-project-name" class="text-3xl font-bold text-white"></h1>
+<!-- SCREEN 3: RESULTS -->
+<div id="screen-results" class="screen">
+  <!-- Sticky header -->
+  <div style="background:var(--midnight-card);border-bottom:1px solid var(--midnight-border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;" class="no-print">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button onclick="showScreen('setup')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;">&#8592; New Assessment</button>
+      <span style="color:var(--midnight-border);">|</span>
+      <span id="result-title" style="font-size:14px;font-weight:700;color:var(--text-primary);"></span>
     </div>
-    <div class="flex gap-3 flex-wrap">
-      <div id="rai-badge" class="card px-5 py-3 text-center">
-        <div class="text-xs text-slate-400 mb-1">RAI Score</div>
-        <div id="rai-score-val" class="text-2xl font-bold"></div>
+    <button onclick="window.print()" class="btn-secondary" style="font-size:13px;padding:6px 14px;">Print / Export</button>
+  </div>
+
+  <div style="max-width:1100px;margin:0 auto;padding:24px;">
+    <!-- Badges row -->
+    <div id="badges-row" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:20px;"></div>
+    <!-- Alert banners -->
+    <div id="alert-banners"></div>
+
+    <!-- Tabs -->
+    <div style="border-bottom:1px solid var(--midnight-border);margin-bottom:24px;display:flex;gap:0;" class="no-print">
+      <button class="tab-btn active" onclick="showTab('overview')" id="tab-overview">Overview</button>
+      <button class="tab-btn" onclick="showTab('graph')" id="tab-graph">Graph</button>
+      <button class="tab-btn" onclick="showTab('gaps')" id="tab-gaps">Gaps</button>
+      <button class="tab-btn" onclick="showTab('rai')" id="tab-rai">RAI Scorecard</button>
+    </div>
+
+    <!-- TAB: OVERVIEW -->
+    <div class="tab-panel active" id="panel-overview">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;">
+        <div class="card" style="padding:20px;">
+          <h3 style="font-size:14px;font-weight:700;color:var(--text-muted);margin:0 0 16px;text-transform:uppercase;letter-spacing:0.06em;">Domain Coverage Radar</h3>
+          <canvas id="radar-chart" style="max-height:320px;"></canvas>
+        </div>
+        <div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;" id="domain-cards"></div>
+        </div>
       </div>
-      <div id="tier-badge" class="card px-5 py-3 text-center">
-        <div class="text-xs text-slate-400 mb-1">Risk Tier</div>
-        <div id="tier-val" class="text-2xl font-bold"></div>
+    </div>
+
+    <!-- TAB: GRAPH -->
+    <div class="tab-panel" id="panel-graph">
+      <div class="graph-controls no-print">
+        <input type="text" id="graph-search" placeholder="Search nodes..." style="width:200px;padding:7px 12px;font-size:13px;" oninput="applyGraphFilters()">
+        <div id="domain-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        <div style="display:flex;gap:6px;margin-left:auto;align-items:center;">
+          <button class="btn-secondary active" id="risk-all" onclick="setRiskFilter('all')">All</button>
+          <button class="btn-secondary" id="risk-gaps" onclick="setRiskFilter('gaps')">Gaps</button>
+          <button class="btn-secondary" id="risk-strong" onclick="setRiskFilter('strong')">Strong</button>
+          <button class="btn-secondary" onclick="expandAllDomains()">Expand All</button>
+          <button class="btn-secondary" onclick="collapseAllDomains()">Collapse All</button>
+          <span id="node-count" style="font-size:12px;color:var(--text-muted);white-space:nowrap;"></span>
+        </div>
       </div>
-      <div id="coverage-badge" class="card px-5 py-3 text-center">
-        <div class="text-xs text-slate-400 mb-1">Coverage</div>
-        <div id="coverage-val" class="text-2xl font-bold text-indigo-400"></div>
+      <div style="display:flex;">
+        <div id="d3-graph-container" style="flex:1;min-width:0;">
+          <svg id="graph-svg" width="100%" height="580"></svg>
+        </div>
+        <div class="node-panel" id="node-panel">
+          <div id="node-details-empty">Click any node to see details</div>
+          <div id="node-details-content" style="display:none;"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;" class="no-print">
+        <button class="zoom-btn" onclick="zoomIn()">+</button>
+        <button class="zoom-btn" onclick="zoomOut()">&minus;</button>
+        <button class="zoom-btn" onclick="resetZoom()" title="Reset" style="font-size:11px;width:auto;padding:0 10px;">Reset</button>
+      </div>
+    </div>
+
+    <!-- TAB: GAPS -->
+    <div class="tab-panel" id="panel-gaps">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;" class="no-print">
+        <span style="font-size:13px;color:var(--text-muted);">Sort:</span>
+        <button class="btn-secondary active" id="sort-conf" onclick="sortGaps('confidence')">By Confidence</button>
+        <button class="btn-secondary" id="sort-domain" onclick="sortGaps('domain')">By Domain</button>
+        <button class="btn-secondary" id="sort-risk" onclick="sortGaps('risk')">By Risk</button>
+      </div>
+      <div id="gaps-container"></div>
+    </div>
+
+    <!-- TAB: RAI SCORECARD -->
+    <div class="tab-panel" id="panel-rai">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
+        <div>
+          <h3 style="font-size:14px;font-weight:700;color:#FFAB76;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.06em;">Risk Factors Triggered</h3>
+          <div id="rai-triggered"></div>
+        </div>
+        <div>
+          <h3 style="font-size:14px;font-weight:700;color:#69F0AE;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.06em;">Mitigating Factors</h3>
+          <div id="rai-mitigated"></div>
+        </div>
+      </div>
+      <div class="card" style="padding:20px;margin-bottom:20px;">
+        <h3 style="font-size:14px;font-weight:700;color:var(--text-muted);margin:0 0 12px;text-transform:uppercase;letter-spacing:0.06em;">Score Breakdown</h3>
+        <div id="rai-score-bar"></div>
+      </div>
+      <div class="card" style="padding:20px;margin-bottom:20px;">
+        <h3 style="font-size:14px;font-weight:700;color:var(--text-muted);margin:0 0 10px;text-transform:uppercase;letter-spacing:0.06em;">Risk Tier Explanation</h3>
+        <div id="rai-tier-explain"></div>
+      </div>
+      <div class="card" style="padding:20px;">
+        <h3 style="font-size:14px;font-weight:700;color:var(--text-muted);margin:0 0 16px;text-transform:uppercase;letter-spacing:0.06em;">Governance Pathway</h3>
+        <div id="governance-pathway"></div>
       </div>
     </div>
   </div>
-
-  <!-- Review Required Banners -->
-  <div id="banners" class="space-y-2 mb-6"></div>
-
-  <!-- Tabs -->
-  <div class="flex gap-1 mb-6 bg-slate-800 rounded-lg p-1 w-fit">
-    <button onclick="showTab('domains')" id="tab-domains" class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white">Domain Coverage</button>
-    <button onclick="showTab('gaps')" id="tab-gaps" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white">Gaps &amp; Actions</button>
-    <button onclick="showTab('rai')" id="tab-rai" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white">RAI Factors</button>
-  </div>
-
-  <!-- DOMAINS TAB -->
-  <div id="tab-content-domains">
-    <div id="domains-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-  </div>
-
-  <!-- GAPS TAB -->
-  <div id="tab-content-gaps" class="hidden">
-    <p class="text-slate-400 text-sm mb-4">Questions where coverage is below 80% — ordered by risk. Click a row to see recommended actions.</p>
-    <div id="gaps-list" class="space-y-2"></div>
-    <div id="no-gaps" class="hidden card p-8 text-center text-green-400">
-      <div class="text-4xl mb-2">✓</div>
-      <div class="font-semibold">No significant gaps found</div>
-      <div class="text-slate-400 text-sm mt-1">All questions scored above 80% confidence</div>
-    </div>
-  </div>
-
-  <!-- RAI TAB -->
-  <div id="tab-content-rai" class="hidden">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="card p-5">
-        <h3 class="font-semibold text-red-400 mb-3">Risk Factors Triggered</h3>
-        <div id="rai-triggered" class="space-y-2 text-sm"></div>
-      </div>
-      <div class="card p-5">
-        <h3 class="font-semibold text-green-400 mb-3">Mitigating Factors</h3>
-        <div id="rai-mitigating" class="space-y-2 text-sm"></div>
-      </div>
-    </div>
-    <div class="card p-5 mt-4">
-      <h3 class="font-semibold text-slate-300 mb-2">Score Breakdown</h3>
-      <p id="rai-explanation" class="text-sm text-slate-400"></p>
-    </div>
-  </div>
-
-  <button onclick="location.reload()" class="mt-8 text-sm text-slate-400 hover:text-white underline">← New assessment</button>
 </div>
 
 <script>
-// ── Questions ──────────────────────────────────────────────────────────────
+// ============================================================
+// DATA
+// ============================================================
 const DOMAINS = [
   {
-    id: "privacy", name: "Privacy & PIA", color: "#6366f1",
+    id: "privacy", label: "Privacy & PIA", color: "#1565C0",
     questions: [
-      "Has a Privacy Impact Assessment (PIA) been completed or scheduled for this project?",
-      "Does the project collect, process, or store personal information as defined under the Privacy Act?",
-      "Have data minimisation principles been applied — only collecting what is strictly necessary?",
-      "Is there a lawful basis identified for each type of personal data processed?",
-      "Are individuals informed about how their data is used through appropriate notices?",
-      "Is there a data retention and deletion schedule in place for personal data?",
-      "Has cross-border data transfer been assessed for compliance with privacy legislation?",
-      "Are subject access and correction rights supported in the system design?",
-      "Has a Data Protection Officer or privacy advisor reviewed this project?",
-      "Are consent mechanisms implemented where required, and are they freely given, specific, and revocable?"
+      "Has a Privacy Impact Assessment (PIA) been formally initiated and assigned to a privacy officer?",
+      "Does the project collect, use, or disclose personal information as defined under the Privacy Act 1988?",
+      "Have all 13 Australian Privacy Principles (APPs) been assessed for applicability?",
+      "Is there a documented lawful basis for each category of personal data processed?",
+      "Are Privacy Notices or Collection Statements prepared and approved for each data collection touchpoint?",
+      "Has data minimisation been applied — collecting only what is strictly necessary for the stated purpose?",
+      "Is there a data retention schedule specifying deletion timelines for all personal data categories?",
+      "Have cross-border data transfer risks been assessed against APP 8 and relevant adequacy decisions?",
+      "Are individual access, correction, and deletion rights technically supported in the system?",
+      "Has consent architecture been designed to be freely given, specific, informed, and revocable?",
+      "Are there automated decision-making disclosures where the AI makes decisions affecting individuals?",
+      "Has a Children's Online Privacy Protection review been conducted if minors may use the system?",
+      "Is there a breach response plan including OAIC notification procedures within required timeframes?",
+      "Has the Privacy team signed off on the project before go-live?"
     ]
   },
   {
-    id: "supplier", name: "Supplier & Third Party", color: "#8b5cf6",
+    id: "supplier", label: "Supplier & SIA", color: "#7B1FA2",
     questions: [
-      "Have all third-party AI components, APIs, and models been identified and documented?",
-      "Is there a vendor risk assessment process covering AI-specific risks for all suppliers?",
-      "Do supplier contracts include AI governance, data handling, and audit rights clauses?",
-      "Has the provenance and licensing of training data from third parties been verified?",
-      "Are there exit strategies and data portability provisions if a vendor relationship ends?",
+      "Has a Supplier Impact Assessment (SIA) been completed for all AI vendors and data providers?",
+      "Are all third-party AI components, APIs, SDKs, and pre-trained models formally catalogued?",
+      "Do supplier contracts include AI-specific clauses covering data handling, audit rights, and liability?",
+      "Has the provenance, licensing, and copyright status of all training data been verified?",
+      "Have sub-processors (fourth parties) been identified and assessed for AI-specific risks?",
+      "Are there exit strategies and data portability provisions for each critical AI supplier?",
       "Is there ongoing monitoring of third-party model updates that could affect system behaviour?",
-      "Have supply chain security controls been applied to all AI components and dependencies?",
-      "Are third-party AI systems tested in your environment before production deployment?",
-      "Is there a process to assess fourth-party (sub-supplier) AI risks?",
-      "Are SLAs in place that cover AI-specific performance, availability, and bias thresholds?"
+      "Have supplier financial stability and business continuity plans been reviewed?",
+      "Are SLAs defined covering AI-specific metrics: model accuracy, drift thresholds, response time?",
+      "Has a concentration risk assessment been done for dependencies on a single AI provider?",
+      "Are there contractual obligations for suppliers to notify of security incidents within 72 hours?",
+      "Has the supplier's AI ethics policy and responsible AI practices been reviewed and accepted?",
+      "Are there controls to prevent supplier lock-in through model format standardisation and open standards?",
+      "Is supplier performance reviewed quarterly with AI-specific KPIs included in scorecards?"
     ]
   },
   {
-    id: "agentic", name: "Agentic AI", color: "#ec4899",
+    id: "agentic", label: "Agentic AI", color: "#F26522",
     questions: [
-      "Does the system operate autonomously or take actions without human approval for each step?",
-      "Are there defined boundaries on what actions the agent can take and what resources it can access?",
-      "Is there a human-in-the-loop checkpoint before high-stakes or irreversible actions are executed?",
-      "Are agent actions logged in sufficient detail to reconstruct the reasoning behind each decision?",
-      "Is there a kill switch or emergency stop mechanism that can halt agent activity immediately?",
-      "Has the blast radius of agent mistakes been assessed and bounded through sandboxing or permissions?",
-      "Are there rate limits and cost controls to prevent runaway agent execution?",
-      "Has prompt injection and adversarial input testing been performed on the agent?",
-      "Is the agent's goal specification robust against misinterpretation or Goodhart's Law gaming?",
-      "Are multi-agent interaction risks assessed when this agent operates alongside other agents?"
+      "Is the level of autonomy (L0-L5) formally defined and documented for this system?",
+      "Are there explicit, tested boundaries on what actions the agent can and cannot take?",
+      "Is there a mandatory human-in-the-loop checkpoint before all high-stakes or irreversible actions?",
+      "Are agent actions logged with sufficient detail to reconstruct the full reasoning chain post-hoc?",
+      "Is there an emergency stop (kill switch) that halts all agent activity within 30 seconds?",
+      "Has the blast radius of agent errors been bounded through sandboxing, permissions, and rate limits?",
+      "Are there cost controls (daily spend caps, action count limits) to prevent runaway execution?",
+      "Has prompt injection testing been performed by the security team against all agent inputs?",
+      "Is the agent's goal specification peer-reviewed to identify Goodhart's Law or reward hacking risks?",
+      "Are multi-agent interaction risks assessed when this agent communicates with or orchestrates others?",
+      "Is there a defined degradation mode if the agent's underlying LLM is unavailable?",
+      "Have hallucination guardrails been implemented and tested to prevent fabricated actions?",
+      "Is there a simulation/sandbox environment for testing agent behaviour before production changes?",
+      "Are agent capabilities reviewed and re-approved when the underlying model is updated?"
     ]
   },
   {
-    id: "cyber", name: "Cyber Security", color: "#f59e0b",
+    id: "cyber", label: "Cyber Security", color: "#F5A623",
     questions: [
-      "Has a threat model been completed specifically for the AI components of this system?",
-      "Are model weights, training data, and inference endpoints protected against unauthorised access?",
-      "Has adversarial robustness testing (e.g. adversarial examples, model inversion) been performed?",
-      "Are there controls against model theft, extraction attacks, and intellectual property exposure?",
-      "Is data poisoning risk assessed and mitigated for training and fine-tuning pipelines?",
-      "Are API endpoints rate-limited and authenticated to prevent abuse?",
-      "Is there a vulnerability disclosure and patching process for AI-specific CVEs?",
-      "Are secrets (API keys, model credentials) managed through a secrets manager, not hardcoded?",
-      "Has penetration testing been performed on the AI system and its supporting infrastructure?",
-      "Are CIS8 controls applied to the infrastructure hosting the AI system?"
+      "Has a threat model specific to AI components been completed using STRIDE or equivalent?",
+      "Are model weights, training data, and inference endpoints protected with appropriate access controls?",
+      "Has adversarial robustness testing (adversarial examples, model inversion, membership inference) been performed?",
+      "Are controls in place against model theft, model extraction attacks, and IP exposure?",
+      "Has data poisoning risk been assessed and mitigated across training and fine-tuning pipelines?",
+      "Are all API endpoints authenticated, rate-limited, and monitored for abuse patterns?",
+      "Is there a patching and vulnerability management process covering AI-specific CVEs and model updates?",
+      "Are secrets (API keys, model credentials, connection strings) managed via an approved secrets manager?",
+      "Has penetration testing been conducted on the AI system by an independent security team?",
+      "Are CIS8 controls implemented and tested for all infrastructure hosting the AI system?",
+      "Is there network segmentation isolating AI training and inference workloads from corporate networks?",
+      "Are audit logs tamper-evident and retained for a minimum period meeting regulatory requirements?",
+      "Has a Security Impact Assessment (SIA) been completed and approved by the CISO office?",
+      "Are supply chain security controls applied including SBOM (Software Bill of Materials) for AI components?"
     ]
   },
   {
-    id: "ethics", name: "Ethics & Fairness", color: "#22c55e",
+    id: "ethics", label: "Ethics & Fairness", color: "#00A651",
     questions: [
-      "Has a bias and fairness assessment been completed across protected characteristics?",
-      "Are fairness metrics defined, measured, and monitored in production?",
-      "Has the system been tested for disparate impact on vulnerable or marginalised groups?",
-      "Are there processes to receive and act on complaints about unfair or discriminatory outcomes?",
-      "Has an ethics review been completed by a diverse team or ethics board?",
-      "Is the system's purpose aligned with the organisation's AI ethics principles and values?",
-      "Are there guardrails preventing the system from being used for harmful or unethical purposes?",
-      "Has the environmental impact of model training and inference been assessed?",
-      "Are there controls to prevent the system reinforcing harmful social stereotypes?",
-      "Is there a human rights impact assessment for high-risk or externally deployed systems?"
+      "Has a bias and fairness assessment been completed across all protected characteristics?",
+      "Are fairness metrics defined, baselined, and continuously monitored in production?",
+      "Has disparate impact testing been conducted on historically disadvantaged or vulnerable groups?",
+      "Is there a formal complaints process for individuals affected by unfair AI outcomes?",
+      "Has an ethics review been conducted by a diverse review panel or ethics board?",
+      "Is the system's purpose explicitly aligned with the organisation's Responsible AI principles?",
+      "Are there hard guardrails preventing the system from producing harmful, discriminatory, or illegal outputs?",
+      "Has the environmental impact (energy, carbon) of training and inference been measured and disclosed?",
+      "Are there controls to detect and prevent harmful social stereotype reinforcement?",
+      "Has a human rights impact assessment been completed for systems deployed externally?",
+      "Is there transparency to end users that they are interacting with an AI system?",
+      "Are there defined sunset criteria if the system produces persistent unfair outcomes?"
     ]
   },
   {
-    id: "model_risk", name: "Model Risk", color: "#0ea5e9",
+    id: "model", label: "Model Risk", color: "#42A5F5",
     questions: [
-      "Is there a model card or equivalent documentation covering the model's purpose, limitations, and performance?",
-      "Has the model been validated on out-of-distribution and edge-case data?",
-      "Are model performance metrics monitored in production with alerting on degradation?",
-      "Is there a defined process for model retraining, versioning, and rollback?",
-      "Has concept drift and data drift detection been implemented?",
-      "Are model explainability and interpretability requirements defined and met?",
-      "Is there a champion-challenger or A/B testing framework for model updates?",
-      "Has the model been stress-tested under peak load and adversarial conditions?",
-      "Are uncertainty estimates or confidence scores provided with model outputs?",
-      "Is there independent model validation by a party separate from the development team?"
+      "Is there a model card documenting purpose, architecture, training data, limitations, and known failure modes?",
+      "Has independent model validation been completed by a party separate from the development team?",
+      "Are model performance metrics monitored in production with automated alerting on degradation?",
+      "Is there a defined model versioning, promotion, and rollback procedure?",
+      "Have concept drift and data drift detection been implemented with defined response thresholds?",
+      "Do model explainability requirements meet the needs of affected stakeholders and regulators?",
+      "Is there a champion-challenger framework for safely testing model updates in production?",
+      "Has the model been stress-tested under peak load, adversarial inputs, and out-of-distribution data?",
+      "Are uncertainty estimates or confidence intervals provided with model outputs?",
+      "Is there a model inventory entry in the enterprise model risk register?",
+      "Have model assumptions been documented and validated against production data?",
+      "Is there a defined trigger for mandatory model review (accuracy drop, data distribution shift, regulatory change)?"
     ]
   },
   {
-    id: "data_governance", name: "Data Governance", color: "#14b8a6",
+    id: "data", label: "Data Governance", color: "#90CAF9",
     questions: [
-      "Is there a data lineage record covering all data used in training, validation, and inference?",
-      "Has the quality, completeness, and representativeness of training data been assessed?",
-      "Are data access controls enforced based on least-privilege principles?",
+      "Is there complete data lineage covering all data used in training, validation, feature engineering, and inference?",
+      "Has a data quality assessment been completed covering accuracy, completeness, and representativeness?",
+      "Are data access controls enforced on a least-privilege basis with quarterly access reviews?",
       "Is there a data catalogue entry for all datasets used by this AI system?",
-      "Are data quality checks automated in the ingestion and preprocessing pipeline?",
-      "Has the risk of training data leakage through model outputs been assessed?",
-      "Is synthetic data use documented with its limitations and generation methodology?",
-      "Are data sharing agreements in place for all externally sourced datasets?",
+      "Are automated data quality checks implemented in ingestion and preprocessing pipelines?",
+      "Has training data leakage risk through model memorisation and output been assessed?",
+      "Is synthetic data use documented with generation methodology, limitations, and validation results?",
+      "Are data sharing agreements in place and up to date for all externally sourced datasets?",
       "Is there a process to handle data corrections that may require model retraining?",
-      "Are data governance policies enforced technically, not just as policy documents?"
+      "Are data governance policies technically enforced (not just documented) with automated compliance checks?",
+      "Is there a defined master data management approach ensuring consistency across training and production?",
+      "Has a data mesh or data product owner been assigned accountability for AI training datasets?"
     ]
   },
   {
-    id: "operational", name: "Operational Risk", color: "#f97316",
+    id: "ops", label: "Operational Risk", color: "#FFC107",
     questions: [
-      "Is there a runbook covering common failure scenarios and their remediation steps?",
-      "Are business continuity and disaster recovery plans updated for this AI system?",
-      "Is there a defined process for human escalation when the AI system cannot handle a case?",
-      "Are operational metrics (latency, throughput, error rates) monitored with SLAs?",
-      "Is there a change management process covering model and configuration updates?",
-      "Has the system been load-tested to confirm it meets peak demand requirements?",
-      "Are there circuit breakers to degrade gracefully when dependent services fail?",
-      "Is there an incident response plan specific to AI system failures or unexpected behaviour?",
-      "Are on-call responsibilities and escalation paths documented for AI system issues?",
-      "Is there a post-incident review process that feeds back into risk assessments?"
+      "Is there a runbook covering the top 10 failure scenarios with tested remediation steps?",
+      "Are business continuity and disaster recovery plans updated to include this AI system?",
+      "Is there a defined human escalation path for cases the AI system cannot handle?",
+      "Are operational SLAs defined for latency, throughput, availability, and accuracy?",
+      "Does the change management process cover model updates and configuration changes?",
+      "Has the system been load-tested to confirm it meets peak demand with acceptable degradation?",
+      "Are circuit breakers implemented to degrade gracefully when dependent services fail?",
+      "Is there an AI-specific incident response plan covering unexpected behaviour and harmful outputs?",
+      "Are on-call responsibilities and escalation paths documented and regularly tested?",
+      "Is there a post-incident review process that feeds back into the model and risk register?",
+      "Are monitoring dashboards available to operations teams showing AI-specific health metrics?",
+      "Has a game day or chaos engineering exercise been conducted to test resilience?"
     ]
   },
   {
-    id: "regulatory", name: "Regulatory & Legal", color: "#a855f7",
+    id: "legal", label: "Regulatory & Legal", color: "#CE93D8",
     questions: [
-      "Has a regulatory landscape assessment been completed for all jurisdictions where the system will operate?",
-      "Does the system comply with EU AI Act requirements for its risk classification?",
-      "Are there legal opinions on the use of training data under copyright and IP law?",
-      "Is there a compliance register mapping each regulatory requirement to a specific control?",
-      "Has the system been assessed against sector-specific regulations (e.g. financial services, health)?",
-      "Are there processes to monitor and respond to changes in AI regulation?",
-      "Is there legal review of all user-facing outputs to identify defamation or misleading information risks?",
-      "Has the system been assessed against consumer protection laws in all target markets?",
-      "Are there contractual liability clauses that reflect AI-specific risks in customer agreements?",
-      "Is there a record of regulatory consultations or pre-approval engagements where required?"
+      "Has a regulatory landscape assessment been completed for all operating jurisdictions?",
+      "Has the system been classified under the EU AI Act and documented with required conformity evidence?",
+      "Are there legal opinions on training data use under copyright, IP, and database rights?",
+      "Is there a compliance register mapping each regulatory requirement to a specific technical control?",
+      "Has the system been assessed against sector-specific regulations (financial services, healthcare, etc.)?",
+      "Is there a regulatory change monitoring process with assigned responsibility for AI law updates?",
+      "Has legal reviewed all user-facing outputs for defamation, misleading information, and consumer law risks?",
+      "Are consumer protection law requirements met including right to explanation for automated decisions?",
+      "Do customer agreements include AI-specific liability, limitation, and indemnity clauses?",
+      "Have pre-deployment regulatory consultations been conducted where required?",
+      "Is there a record of compliance attestations reviewed and signed by accountable executives?",
+      "Has the system been assessed against the Australian AI Ethics Framework voluntary principles?"
     ]
   },
   {
-    id: "arb", name: "ARB / Agentic Review", color: "#64748b",
+    id: "arb", label: "ARB / Architecture", color: "#546E7A",
     questions: [
-      "Has the business problem been clearly articulated and validated prior to selecting an AI solution?",
-      "Have non-AI alternatives been evaluated and documented as part of the solution selection process?",
-      "Is there a defined success metric and measurement plan for this AI initiative?",
-      "Has the project been reviewed and approved by the Architecture Review Board?",
-      "Is the AI system built on approved and supported platforms within the organisation's architecture?",
-      "Are the data sources used by this system approved and catalogued in the enterprise data inventory?",
-      "Has a RAG (Retrieval Augmented Generation) architecture review been completed if applicable?",
-      "Are there controls to prevent hallucination outputs from being presented as factual to end users?",
-      "Have security controls been reviewed and approved by the Security Architecture team?",
-      "Is there a user experience review ensuring AI outputs are presented transparently and not misleadingly?",
-      "Has the total cost of ownership including inference costs been modelled and approved?",
-      "Is there a defined process for ongoing model evaluation and replacement as better options emerge?",
+      "Has the business problem been validated and documented before selecting an AI solution?",
+      "Have non-AI alternatives been formally evaluated with a documented decision rationale?",
+      "Is there a defined, measurable success metric and measurement plan approved by the business?",
+      "Has the project been presented to and approved by the Architecture Review Board?",
+      "Is the AI system built on platforms and components that are on the approved technology register?",
+      "Have all data sources been approved and catalogued in the enterprise data inventory?",
+      "If using RAG architecture, has a RAG-specific design review been completed covering retrieval quality, chunking, and citation?",
+      "Are hallucination controls implemented and tested with defined acceptable hallucination rate thresholds?",
+      "Has the Security Architecture team reviewed and approved the security design?",
+      "Has the UX/CX team reviewed that AI outputs are presented transparently and appropriately to end users?",
+      "Has the total cost of ownership including ongoing inference, fine-tuning, and monitoring costs been modelled?",
+      "Is there a model evolution plan covering how the system will be updated as better models emerge?",
       "Has the project been through an AI Council or equivalent governance gate?",
-      "Are there defined escalation paths when the AI system produces unexpected or harmful outputs?"
+      "Is the integration architecture documented with all APIs, event streams, and data flows in an architecture diagram?"
     ]
   }
 ];
@@ -341,9 +485,8 @@ const RAI_FACTORS = [
   { id: "novel_tech", label: "Novel or experimental technology", weight: 3 },
   { id: "external_customers", label: "Directly interacts with external customers", weight: 2 },
   { id: "third_party", label: "Relies on critical third-party AI components", weight: 2 },
-  { id: "real_time", label: "Makes real-time decisions without review", weight: 2 },
+  { id: "real_time", label: "Makes real-time decisions without human review", weight: 2 },
 ];
-
 const RAI_MITIGATIONS = [
   { id: "human_loop", label: "Human-in-the-loop for all consequential decisions", weight: -2 },
   { id: "poc_only", label: "Proof of concept — not in production", weight: -1 },
@@ -351,268 +494,696 @@ const RAI_MITIGATIONS = [
   { id: "existing_approval", label: "Existing governance approval already obtained", weight: -1 },
 ];
 
-// ── State ─────────────────────────────────────────────────────────────────
-let results = { domains: [], gaps: [], rai: null, projectName: "" };
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  apiKey: '',
+  projectName: '',
+  projectDesc: '',
+  domainResults: {},
+  gaps: [],
+  rai: { triggered: [], mitigating: [], score: 0, tier: 'low', reasoning: '' },
+  radarChart: null,
+  d3Simulation: null,
+  d3Zoom: null,
+  d3Svg: null,
+  expandedDomains: new Set(),
+  graphInitialised: false,
+  riskFilter: 'all',
+  gapSort: 'confidence',
+  searchText: '',
+  activeDomainFilters: new Set(DOMAINS.map(d => d.id))
+};
 
-// ── UI helpers ─────────────────────────────────────────────────────────────
-function show(id) { document.getElementById(id).classList.remove("hidden"); }
-function hide(id) { document.getElementById(id).classList.add("hidden"); }
+// ============================================================
+// SCREEN MANAGEMENT
+// ============================================================
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+}
+
 function showTab(name) {
-  ["domains","gaps","rai"].forEach(t => {
-    document.getElementById("tab-content-"+t).classList.add("hidden");
-    document.getElementById("tab-"+t).className = "tab-btn px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white";
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'overview' && !state.radarChart) initRadar();
+  if (name === 'graph') { setTimeout(() => { if (!state.graphInitialised) initGraph(); else applyGraphFilters(); }, 50); }
+}
+
+// ============================================================
+// ASSESSMENT LOGIC
+// ============================================================
+async function startAssessment() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  const projectName = document.getElementById('project-name').value.trim();
+  const projectDesc = document.getElementById('project-desc').value.trim();
+  const errEl = document.getElementById('setup-error');
+  errEl.style.display = 'none';
+  if (!apiKey) { errEl.textContent = 'Please enter your Anthropic API key.'; errEl.style.display = 'block'; return; }
+  if (!projectName) { errEl.textContent = 'Please enter a project name.'; errEl.style.display = 'block'; return; }
+  if (!projectDesc || projectDesc.length < 50) { errEl.textContent = 'Please provide a detailed project description (at least 50 characters).'; errEl.style.display = 'block'; return; }
+  state.apiKey = apiKey;
+  state.projectName = projectName;
+  state.projectDesc = projectDesc;
+  state.domainResults = {};
+  state.gaps = [];
+  state.graphInitialised = false;
+  state.expandedDomains.clear();
+  showScreen('analysis');
+  buildSteps();
+  await runDomains();
+  await runRAI();
+  renderResults();
+  showScreen('results');
+}
+
+function buildSteps() {
+  const container = document.getElementById('steps-container');
+  container.innerHTML = '';
+  [...DOMAINS, { id: 'rai', label: 'RAI Scorecard' }].forEach(d => {
+    const div = document.createElement('div');
+    div.className = 'step-item';
+    div.id = 'step-' + d.id;
+    div.innerHTML = `<div class="step-icon pending" id="step-icon-${d.id}">&#9679;</div><span style="font-size:14px;">${d.label}</span>`;
+    container.appendChild(div);
   });
-  show("tab-content-"+name);
-  document.getElementById("tab-"+name).className = "tab-btn px-4 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white";
 }
 
-function confColor(c) {
-  if (c >= 0.8) return "#22c55e";
-  if (c >= 0.5) return "#f59e0b";
-  return "#ef4444";
-}
-function confLabel(c) {
-  if (c >= 0.8) return "Strong";
-  if (c >= 0.5) return "Partial";
-  return "Gap";
-}
-function riskTierClass(tier) {
-  if (tier === "critical") return "risk-critical";
-  if (tier === "high") return "risk-high";
-  if (tier === "medium") return "risk-medium";
-  return "risk-low";
+function setStepStatus(id, status) {
+  const icon = document.getElementById('step-icon-' + id);
+  if (!icon) return;
+  icon.className = 'step-icon ' + status;
+  if (status === 'running') icon.innerHTML = '<span class="spinner"></span>';
+  else if (status === 'done') icon.innerHTML = '&#10003;';
+  else if (status === 'error') icon.innerHTML = '&#10007;';
+  else icon.innerHTML = '&#9679;';
 }
 
-// ── Anthropic API call ─────────────────────────────────────────────────────
-async function callClaude(apiKey, messages, systemPrompt) {
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
+function updateProgress(done, total) {
+  const pct = Math.round((done / total) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = pct + '%';
+}
+
+async function callAnthropic(systemPrompt, userPrompt) {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
     headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-      "anthropic-dangerous-direct-browser-access": "true",
+      'x-api-key': state.apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
+      model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       system: systemPrompt,
-      messages,
-    }),
+      messages: [{ role: 'user', content: userPrompt }]
+    })
   });
   if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error?.message || `API error ${resp.status}`);
+    const err = await resp.text();
+    throw new Error('API error ' + resp.status + ': ' + err);
   }
   const data = await resp.json();
   return data.content[0].text;
 }
 
-// ── Assessment logic ───────────────────────────────────────────────────────
-async function startAssessment() {
-  const apiKey = document.getElementById("api-key").value.trim();
-  const projectName = document.getElementById("project-name").value.trim();
-  const projectDesc = document.getElementById("project-desc").value.trim();
-  const errEl = document.getElementById("setup-error");
-
-  if (!apiKey || !apiKey.startsWith("sk-")) { errEl.textContent = "Please enter a valid Anthropic API key."; errEl.classList.remove("hidden"); return; }
-  if (!projectName) { errEl.textContent = "Please enter a project name."; errEl.classList.remove("hidden"); return; }
-  if (projectDesc.length < 50) { errEl.textContent = "Please provide a more detailed project description (at least 50 characters)."; errEl.classList.remove("hidden"); return; }
-  errEl.classList.add("hidden");
-
-  results.projectName = projectName;
-  hide("screen-setup");
-  show("screen-analysis");
-
-  const steps = document.getElementById("progress-steps");
-  steps.innerHTML = "";
-  const allSteps = [...DOMAINS.map(d => d.name), "RAI Scorecard"];
-  allSteps.forEach((s, i) => {
-    steps.innerHTML += `<div class="progress-step" id="step-${i}"><span id="step-icon-${i}">○</span> ${s}</div>`;
-  });
-
-  try {
-    const domainResults = [];
-    for (let i = 0; i < DOMAINS.length; i++) {
-      const domain = DOMAINS[i];
-      document.getElementById("step-"+i).className = "progress-step active";
-      document.getElementById("step-icon-"+i).innerHTML = '<span class="spinner"></span>';
-
-      const qList = domain.questions.map((q, j) => `Q${j+1}: ${q}`).join("\n");
-      const systemPrompt = `You are an AI governance expert. Analyse the project description and rate coverage for each question.
-Return ONLY valid JSON — no markdown, no explanation. Format:
-{"questions":[{"id":1,"confidence":0.0,"evidence":"brief evidence from the text or 'Not addressed'","gap":"one-sentence gap description if confidence < 0.8, else null"},...]}
-Confidence scale: 1.0=fully addressed, 0.7=partially, 0.4=mentioned but insufficient, 0.1=not addressed.`;
-
-      const userMsg = `Project: ${projectName}\n\nDescription:\n${projectDesc}\n\nDomain: ${domain.name}\nQuestions:\n${qList}`;
-
-      let parsed;
-      try {
-        const raw = await callClaude(apiKey, [{ role: "user", content: userMsg }], systemPrompt);
-        const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-        parsed = JSON.parse(cleaned);
-      } catch (e) {
-        parsed = { questions: domain.questions.map((_, j) => ({ id: j+1, confidence: 0.3, evidence: "Parse error", gap: "Unable to analyse" })) };
-      }
-
-      const qResults = (parsed.questions || []).map((r, j) => ({
-        domain: domain.name,
-        domainId: domain.id,
-        question: domain.questions[j] || "",
-        confidence: Math.max(0, Math.min(1, r.confidence || 0)),
-        evidence: r.evidence || "",
-        gap: r.gap || null,
-      }));
-
-      const avgConf = qResults.reduce((s, q) => s + q.confidence, 0) / qResults.length;
-      domainResults.push({ ...domain, avgConf, questions: qResults });
-
-      document.getElementById("step-"+i).className = "progress-step done";
-      document.getElementById("step-icon-"+i).textContent = "✓";
-      const pct = Math.round(((i+1) / allSteps.length) * 100);
-      document.getElementById("progress-bar").style.width = pct + "%";
-      document.getElementById("progress-label").textContent = pct + "%";
-    }
-
-    // RAI Scorecard
-    const raiStepIdx = DOMAINS.length;
-    document.getElementById("step-"+raiStepIdx).className = "progress-step active";
-    document.getElementById("step-icon-"+raiStepIdx).innerHTML = '<span class="spinner"></span>';
-
-    const raiFactorList = RAI_FACTORS.map(f => `- ${f.label} (weight: +${f.weight})`).join("\n");
-    const raiMitList = RAI_MITIGATIONS.map(f => `- ${f.label} (weight: ${f.weight})`).join("\n");
-    const raiSystem = `You are an AI risk assessor. Identify which risk factors apply to this project.
-Return ONLY valid JSON: {"triggered":["factor label",...], "mitigating":["factor label",...], "reasoning":"2 sentence explanation"}`;
-    const raiUser = `Project: ${projectName}\n\n${projectDesc}\n\nRisk factors to check:\n${raiFactorList}\n\nMitigating factors to check:\n${raiMitList}`;
-
-    let raiData = { triggered: [], mitigating: [], reasoning: "" };
+async function runDomains() {
+  const total = DOMAINS.length + 1;
+  for (let i = 0; i < DOMAINS.length; i++) {
+    const domain = DOMAINS[i];
+    setStepStatus(domain.id, 'running');
+    updateProgress(i, total);
     try {
-      const raiRaw = await callClaude(apiKey, [{ role: "user", content: raiUser }], raiSystem);
-      const raiCleaned = raiRaw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      raiData = JSON.parse(raiCleaned);
-    } catch (e) { /* use defaults */ }
-
-    let raiScore = 0;
-    const triggeredFactors = RAI_FACTORS.filter(f => (raiData.triggered || []).some(t => t.toLowerCase().includes(f.label.toLowerCase().slice(0, 15))));
-    const mitigatingFactors = RAI_MITIGATIONS.filter(f => (raiData.mitigating || []).some(m => m.toLowerCase().includes(f.label.toLowerCase().slice(0, 15))));
-    triggeredFactors.forEach(f => raiScore += f.weight);
-    mitigatingFactors.forEach(f => raiScore += f.weight);
-    raiScore = Math.max(0, raiScore);
-    const raiTier = raiScore >= 15 ? "critical" : raiScore >= 8 ? "high" : raiScore >= 4 ? "medium" : "low";
-
-    document.getElementById("step-"+raiStepIdx).className = "progress-step done";
-    document.getElementById("step-icon-"+raiStepIdx).textContent = "✓";
-    document.getElementById("progress-bar").style.width = "100%";
-    document.getElementById("progress-label").textContent = "100%";
-
-    results.domains = domainResults;
-    results.gaps = domainResults.flatMap(d => d.questions.filter(q => q.confidence < 0.8)).sort((a, b) => a.confidence - b.confidence);
-    results.rai = { score: raiScore, tier: raiTier, triggered: triggeredFactors, mitigating: mitigatingFactors, reasoning: raiData.reasoning || "", requiresAdrb: raiScore >= 8, requiresAiCouncil: raiScore >= 15 };
-
-    await new Promise(r => setTimeout(r, 600));
-    renderResults();
-
-  } catch (err) {
-    hide("screen-analysis");
-    show("screen-setup");
-    document.getElementById("setup-error").textContent = "Error: " + err.message;
-    document.getElementById("setup-error").classList.remove("hidden");
+      const systemPrompt = `You are an AI governance expert assessing an AI project. For each question, provide a JSON response evaluating whether the project has addressed this governance requirement based on the project description. Return ONLY valid JSON in this exact format: {"questions":[{"id":1,"confidence":0.0,"evidence":"brief evidence from description","gap":"what is missing or unclear","controls":["control 1","control 2"],"standards":["standard/reference"]}]}. Confidence 0.0=no evidence, 0.5=partial, 1.0=fully addressed. Be realistic and critical — assume gaps exist unless explicitly evidenced.`;
+      const qList = domain.questions.map((q, idx) => `${idx + 1}. ${q}`).join('\n');
+      const userPrompt = `Project: "${state.projectName}"\nDescription: ${state.projectDesc}\n\nDomain: ${domain.label}\nAssess these questions:\n${qList}`;
+      const raw = await callAnthropic(systemPrompt, userPrompt);
+      const json = extractJSON(raw);
+      state.domainResults[domain.id] = json.questions || [];
+      setStepStatus(domain.id, 'done');
+    } catch (e) {
+      console.error('Domain error', domain.id, e);
+      state.domainResults[domain.id] = domain.questions.map((_, idx) => ({
+        id: idx + 1, confidence: 0.3, evidence: 'Error retrieving assessment.', gap: e.message, controls: [], standards: []
+      }));
+      setStepStatus(domain.id, 'error');
+    }
+    updateProgress(i + 1, total);
   }
 }
 
-// ── Render results ─────────────────────────────────────────────────────────
+async function runRAI() {
+  setStepStatus('rai', 'running');
+  try {
+    const factorList = RAI_FACTORS.map(f => `- ${f.id}: ${f.label} (weight +${f.weight})`).join('\n');
+    const mitList = RAI_MITIGATIONS.map(m => `- ${m.id}: ${m.label} (weight ${m.weight})`).join('\n');
+    const systemPrompt = `You are an AI governance expert performing a Responsible AI (RAI) risk assessment. Based on the project description, identify which risk factors apply and which mitigations are in place. Return ONLY valid JSON: {"triggered":["factor_id1","factor_id2"],"mitigating":["mitigation_id1"],"reasoning":"brief plain-English explanation of the risk profile"}`;
+    const userPrompt = `Project: "${state.projectName}"\nDescription: ${state.projectDesc}\n\nRisk Factors (select which apply):\n${factorList}\n\nMitigating Factors (select which apply):\n${mitList}`;
+    const raw = await callAnthropic(systemPrompt, userPrompt);
+    const json = extractJSON(raw);
+    const triggered = json.triggered || [];
+    const mitigating = json.mitigating || [];
+    let score = 0;
+    triggered.forEach(id => { const f = RAI_FACTORS.find(x => x.id === id); if (f) score += f.weight; });
+    mitigating.forEach(id => { const m = RAI_MITIGATIONS.find(x => x.id === id); if (m) score += m.weight; });
+    score = Math.max(0, score);
+    let tier = 'low';
+    if (score >= 15) tier = 'critical';
+    else if (score >= 8) tier = 'high';
+    else if (score >= 4) tier = 'medium';
+    state.rai = { triggered, mitigating, score, tier, reasoning: json.reasoning || '' };
+    setStepStatus('rai', 'done');
+  } catch (e) {
+    console.error('RAI error', e);
+    state.rai = { triggered: [], mitigating: [], score: 0, tier: 'low', reasoning: 'Error retrieving RAI assessment: ' + e.message };
+    setStepStatus('rai', 'error');
+  }
+  updateProgress(DOMAINS.length + 1, DOMAINS.length + 1);
+}
+
+function extractJSON(text) {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (match) return JSON.parse(match[0]);
+  return JSON.parse(text);
+}
+
+// ============================================================
+// RENDER RESULTS
+// ============================================================
 function renderResults() {
-  hide("screen-analysis");
-  show("screen-results");
+  document.getElementById('result-title').textContent = state.projectName;
+  buildGaps();
+  renderBadges();
+  renderDomainCards();
+  renderGapsTab();
+  renderRAITab();
+  initRadar();
+  buildDomainChips();
+}
 
-  document.getElementById("result-project-name").textContent = results.projectName;
-
-  const rai = results.rai;
-  document.getElementById("rai-score-val").textContent = rai.score;
-  document.getElementById("rai-score-val").className = "text-2xl font-bold " + (rai.tier === "critical" ? "text-red-400" : rai.tier === "high" ? "text-orange-400" : rai.tier === "medium" ? "text-yellow-400" : "text-green-400");
-  document.getElementById("tier-val").textContent = rai.tier.charAt(0).toUpperCase() + rai.tier.slice(1);
-  document.getElementById("tier-val").className = "text-2xl font-bold " + (rai.tier === "critical" ? "text-red-400" : rai.tier === "high" ? "text-orange-400" : rai.tier === "medium" ? "text-yellow-400" : "text-green-400");
-
-  const totalQ = results.domains.reduce((s, d) => s + d.questions.length, 0);
-  const coveredQ = results.domains.reduce((s, d) => s + d.questions.filter(q => q.confidence >= 0.8).length, 0);
-  const coveragePct = Math.round((coveredQ / totalQ) * 100);
-  document.getElementById("coverage-val").textContent = coveragePct + "%";
-
-  // Banners
-  const banners = document.getElementById("banners");
-  banners.innerHTML = "";
-  if (rai.requiresAiCouncil) banners.innerHTML += `<div class="card p-3 flex items-center gap-3 border-red-500/50"><span class="text-red-400 text-lg">⚠</span><div><span class="font-semibold text-red-400">AI Council Review Required</span> <span class="text-slate-400 text-sm">— RAI score ${rai.score} exceeds critical threshold (≥15)</span></div></div>`;
-  if (rai.requiresAdrb && !rai.requiresAiCouncil) banners.innerHTML += `<div class="card p-3 flex items-center gap-3 border-orange-500/50"><span class="text-orange-400 text-lg">⚠</span><div><span class="font-semibold text-orange-400">ADRB Review Required</span> <span class="text-slate-400 text-sm">— RAI score ${rai.score} exceeds high threshold (≥8)</span></div></div>`;
-
-  // Domains
-  const grid = document.getElementById("domains-grid");
-  grid.innerHTML = "";
-  results.domains.forEach(d => {
-    const pct = Math.round(d.avgConf * 100);
-    const color = confColor(d.avgConf);
-    const gaps = d.questions.filter(q => q.confidence < 0.8).length;
-    grid.innerHTML += `
-      <div class="card p-5">
-        <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-full" style="background:${d.color}"></div>
-            <span class="font-semibold text-sm">${d.name}</span>
-          </div>
-          <span class="font-bold text-lg" style="color:${color}">${pct}%</span>
-        </div>
-        <div class="bar-bg mb-2"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
-        <div class="flex justify-between text-xs text-slate-400">
-          <span>${d.questions.filter(q => q.confidence >= 0.8).length}/${d.questions.length} questions covered</span>
-          ${gaps > 0 ? `<span style="color:${color}">${gaps} gap${gaps > 1 ? "s" : ""}</span>` : '<span class="text-green-400">No gaps</span>'}
-        </div>
-      </div>`;
+function buildGaps() {
+  state.gaps = [];
+  DOMAINS.forEach(domain => {
+    const results = state.domainResults[domain.id] || [];
+    results.forEach((r, idx) => {
+      state.gaps.push({
+        domain: domain,
+        questionText: domain.questions[idx] || '',
+        confidence: r.confidence,
+        evidence: r.evidence || '',
+        gap: r.gap || '',
+        controls: r.controls || [],
+        standards: r.standards || [],
+        idx
+      });
+    });
   });
+}
 
-  // Gaps
-  const gapsList = document.getElementById("gaps-list");
-  gapsList.innerHTML = "";
-  if (results.gaps.length === 0) {
-    show("no-gaps");
-  } else {
-    results.gaps.forEach((g, i) => {
-      const pct = Math.round(g.confidence * 100);
-      const color = confColor(g.confidence);
-      const label = confLabel(g.confidence);
-      gapsList.innerHTML += `
-        <details class="card overflow-hidden">
-          <summary class="p-4 flex items-center gap-3">
-            <div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${color}"></div>
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium text-slate-200 truncate">${g.question}</div>
-              <div class="text-xs text-slate-400 mt-0.5">${g.domain}</div>
-            </div>
-            <div class="flex-shrink-0 flex items-center gap-2">
-              <span class="tag" style="background:${color}20;color:${color}">${label}</span>
-              <span class="font-bold text-sm" style="color:${color}">${pct}%</span>
-              <span class="text-slate-500 text-xs">▼</span>
-            </div>
-          </summary>
-          <div class="px-4 pb-4 border-t border-slate-700 pt-3 space-y-2">
-            ${g.evidence ? `<div class="text-sm"><span class="text-slate-400">Evidence found: </span><span class="text-slate-300">${g.evidence}</span></div>` : ""}
-            ${g.gap ? `<div class="text-sm"><span class="text-slate-400">Gap: </span><span class="text-yellow-300">${g.gap}</span></div>` : ""}
-            <div class="bar-bg mt-2"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+function getDomainCoverage(domainId) {
+  const results = state.domainResults[domainId] || [];
+  if (!results.length) return 0;
+  const avg = results.reduce((s, r) => s + (r.confidence || 0), 0) / results.length;
+  return Math.round(avg * 100);
+}
+
+function overallCoverage() {
+  const vals = DOMAINS.map(d => getDomainCoverage(d.id));
+  return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+}
+
+function renderBadges() {
+  const row = document.getElementById('badges-row');
+  const tier = state.rai.tier;
+  const score = state.rai.score;
+  const cov = overallCoverage();
+  row.innerHTML = `
+    <span style="font-size:16px;font-weight:700;color:var(--text-primary);">${escHtml(state.projectName)}</span>
+    <span class="risk-badge risk-${tier}">RAI: ${tier.toUpperCase()} (${score} pts)</span>
+    <span class="coverage-badge">Coverage: ${cov}%</span>
+  `;
+  const banners = document.getElementById('alert-banners');
+  banners.innerHTML = '';
+  if (tier === 'critical') {
+    banners.innerHTML += `<div class="alert-banner alert-critical">&#9888; ADRB + AI Council sign-off required before deployment</div>`;
+    banners.innerHTML += `<div class="alert-banner alert-critical">&#9888; AI Council review must be completed — governance gate blocked</div>`;
+  } else if (tier === 'high') {
+    banners.innerHTML += `<div class="alert-banner alert-high">&#9888; Architecture Decision Review Board (ADRB) approval required</div>`;
+  }
+}
+
+function renderDomainCards() {
+  const container = document.getElementById('domain-cards');
+  container.innerHTML = '';
+  DOMAINS.forEach(domain => {
+    const cov = getDomainCoverage(domain.id);
+    const results = state.domainResults[domain.id] || [];
+    const gaps = results.filter(r => r.confidence < 0.5).length;
+    const card = document.createElement('div');
+    card.className = 'domain-card';
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <div style="width:10px;height:10px;border-radius:50%;background:${domain.color};flex-shrink:0;"></div>
+        <span style="font-size:12px;font-weight:700;">${domain.label}</span>
+        <span style="margin-left:auto;font-size:12px;font-weight:800;color:${cov >= 70 ? 'var(--land)' : cov >= 40 ? 'var(--sun)' : 'var(--earth)'};">${cov}%</span>
+      </div>
+      <div class="progress-bar-bg" style="height:5px;"><div style="height:5px;border-radius:3px;background:${domain.color};width:${cov}%;transition:width 0.6s;"></div></div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">${gaps} gap${gaps !== 1 ? 's' : ''} identified</div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function renderGapsTab() {
+  const container = document.getElementById('gaps-container');
+  container.innerHTML = '';
+  let sorted = [...state.gaps];
+  if (state.gapSort === 'confidence') sorted.sort((a, b) => a.confidence - b.confidence);
+  else if (state.gapSort === 'domain') sorted.sort((a, b) => a.domain.label.localeCompare(b.domain.label));
+  else if (state.gapSort === 'risk') sorted.sort((a, b) => a.confidence - b.confidence);
+  const gapItems = sorted.filter(g => g.confidence < 0.8);
+  if (!gapItems.length) {
+    container.innerHTML = `<div style="text-align:center;padding:60px;color:var(--land);">
+      <div style="font-size:40px;margin-bottom:12px;">&#10003;</div>
+      <div style="font-size:16px;font-weight:700;">All domains score 80%+ — no significant gaps identified.</div>
+    </div>`;
+    return;
+  }
+  gapItems.forEach((g, i) => {
+    const conf = Math.round(g.confidence * 100);
+    const confColor = g.confidence >= 0.8 ? 'var(--land)' : g.confidence >= 0.5 ? 'var(--sun)' : 'var(--earth)';
+    const riskLabel = g.confidence < 0.3 ? 'Critical Gap' : g.confidence < 0.5 ? 'High Gap' : g.confidence < 0.8 ? 'Moderate Gap' : 'Low Gap';
+    const det = document.createElement('details');
+    det.className = 'gap-card';
+    const ctrlHtml = g.controls.length ? g.controls.map(c => `<li>${escHtml(c)}</li>`).join('') : '<li>No specific controls provided.</li>';
+    const stdHtml = g.standards.length ? g.standards.map(s => `<span style="background:rgba(66,165,245,0.12);color:var(--sky-light);padding:2px 8px;border-radius:10px;font-size:11px;margin-right:4px;margin-bottom:4px;display:inline-block;">${escHtml(s)}</span>`).join('') : '';
+    det.innerHTML = `
+      <summary>
+        <div class="dot-indicator" style="background:${g.domain.color};"></div>
+        <span style="flex:1;font-size:13px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:400px;" title="${escHtml(g.questionText)}">${escHtml(g.questionText.substring(0, 90))}${g.questionText.length > 90 ? '...' : ''}</span>
+        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:12px;">
+          <div class="conf-bar" style="width:80px;"><div class="conf-fill" style="width:${conf}%;background:${confColor};"></div></div>
+          <span style="font-size:11px;font-weight:700;color:${confColor};width:30px;text-align:right;">${conf}%</span>
+          <span style="font-size:11px;font-weight:700;color:${confColor};padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.06);">${riskLabel}</span>
+        </div>
+      </summary>
+      <div class="gap-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Evidence Found</div>
+            <p style="font-size:13px;color:var(--text-primary);margin:0;line-height:1.6;">${escHtml(g.evidence || 'No evidence found in description.')}</p>
           </div>
-        </details>`;
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Gap Description</div>
+            <p style="font-size:13px;color:var(--text-primary);margin:0;line-height:1.6;">${escHtml(g.gap || 'No specific gap described.')}</p>
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Recommended Controls</div>
+          <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--text-primary);">${ctrlHtml}</ul>
+        </div>
+        ${stdHtml ? `<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Standards & References</div><div>${stdHtml}</div></div>` : ''}
+      </div>
+    `;
+    container.appendChild(det);
+  });
+}
+
+function sortGaps(mode) {
+  state.gapSort = mode;
+  document.querySelectorAll('[id^="sort-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('sort-' + mode).classList.add('active');
+  renderGapsTab();
+}
+
+function renderRAITab() {
+  const { triggered, mitigating, score, tier, reasoning } = state.rai;
+  const triggeredEl = document.getElementById('rai-triggered');
+  const mitigatedEl = document.getElementById('rai-mitigated');
+  triggeredEl.innerHTML = '';
+  mitigatedEl.innerHTML = '';
+  if (!triggered.length) {
+    triggeredEl.innerHTML = '<div style="color:var(--land);font-size:13px;padding:12px;">No risk factors triggered.</div>';
+  } else {
+    triggered.forEach(id => {
+      const f = RAI_FACTORS.find(x => x.id === id);
+      if (!f) return;
+      triggeredEl.innerHTML += `<div class="rai-factor rai-triggered"><span style="color:#FFAB76;font-weight:800;font-size:13px;min-width:32px;">+${f.weight}</span><span style="font-size:13px;">${escHtml(f.label)}</span></div>`;
     });
   }
+  if (!mitigating.length) {
+    mitigatedEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:12px;">No mitigating factors identified.</div>';
+  } else {
+    mitigating.forEach(id => {
+      const m = RAI_MITIGATIONS.find(x => x.id === id);
+      if (!m) return;
+      mitigatedEl.innerHTML += `<div class="rai-factor rai-mitigated"><span style="color:#69F0AE;font-weight:800;font-size:13px;min-width:32px;">${m.weight}</span><span style="font-size:13px;">${escHtml(m.label)}</span></div>`;
+    });
+  }
+  const maxScore = RAI_FACTORS.reduce((s, f) => s + f.weight, 0);
+  const pct = Math.min(100, Math.round((score / maxScore) * 100));
+  const barColor = tier === 'critical' ? 'var(--berry)' : tier === 'high' ? 'var(--earth)' : tier === 'medium' ? 'var(--sun)' : 'var(--land)';
+  document.getElementById('rai-score-bar').innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+      <span style="font-size:13px;color:var(--text-muted);">RAI Score: <strong style="color:var(--text-primary);">${score} / ${maxScore}</strong></span>
+      <span class="risk-badge risk-${tier}">${tier.toUpperCase()}</span>
+    </div>
+    <div class="progress-bar-bg" style="height:12px;"><div style="height:12px;border-radius:6px;background:${barColor};width:${pct}%;transition:width 0.6s;"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-top:6px;">
+      <span>Low (0)</span><span>Medium (4)</span><span>High (8)</span><span>Critical (15)</span>
+    </div>
+    ${reasoning ? `<p style="font-size:13px;color:var(--text-primary);margin:14px 0 0;line-height:1.6;border-top:1px solid var(--midnight-border);padding-top:12px;">${escHtml(reasoning)}</p>` : ''}
+  `;
+  const tierDescriptions = {
+    critical: 'This project poses critical risk requiring both Architecture Decision Review Board (ADRB) and AI Council sign-off. Deployment is blocked until full governance review is completed. The project affects individuals in legally significant ways with minimal human oversight.',
+    high: 'This project is high risk and requires Architecture Decision Review Board (ADRB) approval before deployment. Significant controls must be documented and tested. A governance plan must be approved by accountable executives.',
+    medium: 'This project carries moderate risk. Standard project governance applies with additional AI-specific controls required. The project should be registered in the AI inventory and reviewed by the responsible AI team.',
+    low: 'This project carries low inherent risk. Standard project governance and change management processes apply. Register the project in the AI inventory and ensure ongoing monitoring.'
+  };
+  document.getElementById('rai-tier-explain').innerHTML = `
+    <div class="risk-badge risk-${tier}" style="margin-bottom:10px;">${tier.toUpperCase()} RISK</div>
+    <p style="font-size:14px;color:var(--text-primary);line-height:1.7;margin:0;">${tierDescriptions[tier]}</p>
+  `;
+  const pathwaySteps = [
+    { id: 'register', label: 'Register' },
+    { id: 'assess', label: 'Assess' },
+    { id: 'review', label: 'Review' },
+    { id: 'align', label: 'Align' },
+    { id: 'operate', label: 'Operate' }
+  ];
+  const currentStep = tier === 'critical' ? 'review' : tier === 'high' ? 'review' : tier === 'medium' ? 'assess' : 'operate';
+  const pathEl = document.getElementById('governance-pathway');
+  pathEl.innerHTML = `<div style="display:flex;align-items:center;">` +
+    pathwaySteps.map((step, i) =>
+      `${i > 0 ? '<div class="pathway-connector"></div>' : ''}<div class="pathway-step ${step.id === currentStep ? 'current' : ''}"><div class="dot">${i + 1}</div><div class="label">${step.label}</div></div>`
+    ).join('') +
+    `</div><p style="font-size:13px;color:var(--text-muted);margin-top:16px;line-height:1.6;">Current position: <strong style="color:var(--sun);">${currentStep.charAt(0).toUpperCase() + currentStep.slice(1)}</strong>. ${
+      tier === 'critical' ? 'Governance gate requires ADRB + AI Council review before proceeding to Operate.' :
+      tier === 'high' ? 'ADRB review must be completed before proceeding to Operate.' :
+      tier === 'medium' ? 'Complete RAI assessment and AI team review before proceeding.' :
+      'Proceed with standard change management and AI inventory registration.'
+    }</p>`;
+}
 
-  // RAI
-  const triggered = document.getElementById("rai-triggered");
-  triggered.innerHTML = rai.triggered.length
-    ? rai.triggered.map(f => `<div class="flex items-center gap-2"><span class="text-red-400">+${f.weight}</span><span class="text-slate-300">${f.label}</span></div>`).join("")
-    : '<div class="text-slate-500">No risk factors triggered</div>';
+// ============================================================
+// CHART.JS RADAR
+// ============================================================
+function initRadar() {
+  if (state.radarChart) { state.radarChart.destroy(); state.radarChart = null; }
+  const canvas = document.getElementById('radar-chart');
+  const labels = DOMAINS.map(d => d.label.length > 12 ? d.label.substring(0, 12) + '…' : d.label);
+  const data = DOMAINS.map(d => getDomainCoverage(d.id));
+  state.radarChart = new Chart(canvas, {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: 'rgba(21,101,192,0.18)',
+        borderColor: '#42A5F5',
+        pointBackgroundColor: '#FFC107',
+        pointBorderColor: '#FFC107',
+        pointRadius: 5,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        r: {
+          min: 0, max: 100,
+          ticks: { stepSize: 20, color: '#7FA8CC', font: { size: 10 }, backdropColor: 'transparent' },
+          grid: { color: 'rgba(30,58,110,0.7)' },
+          angleLines: { color: 'rgba(30,58,110,0.7)' },
+          pointLabels: { color: '#90CAF9', font: { size: 10, weight: '600' } }
+        }
+      }
+    }
+  });
+}
 
-  const mitigating = document.getElementById("rai-mitigating");
-  mitigating.innerHTML = rai.mitigating.length
-    ? rai.mitigating.map(f => `<div class="flex items-center gap-2"><span class="text-green-400">${f.weight}</span><span class="text-slate-300">${f.label}</span></div>`).join("")
-    : '<div class="text-slate-500">No mitigating factors identified</div>';
+// ============================================================
+// D3 FORCE GRAPH
+// ============================================================
+function buildDomainChips() {
+  const container = document.getElementById('domain-chips');
+  container.innerHTML = '';
+  DOMAINS.forEach(d => {
+    const chip = document.createElement('div');
+    chip.className = 'chip active';
+    chip.id = 'chip-' + d.id;
+    chip.style.borderColor = d.color + '55';
+    chip.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${d.color};display:inline-block;"></span>${d.label.split(' ')[0]}`;
+    chip.onclick = () => toggleDomainFilter(d.id);
+    container.appendChild(chip);
+  });
+}
 
-  document.getElementById("rai-explanation").textContent = rai.reasoning || `Total RAI score: ${rai.score}. Risk tier: ${rai.tier}.`;
+function toggleDomainFilter(domainId) {
+  if (state.activeDomainFilters.has(domainId)) state.activeDomainFilters.delete(domainId);
+  else state.activeDomainFilters.add(domainId);
+  const chip = document.getElementById('chip-' + domainId);
+  if (chip) chip.classList.toggle('active', state.activeDomainFilters.has(domainId));
+  applyGraphFilters();
+}
+
+function setRiskFilter(mode) {
+  state.riskFilter = mode;
+  ['all', 'gaps', 'strong'].forEach(m => {
+    const btn = document.getElementById('risk-' + m);
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
+  applyGraphFilters();
+}
+
+let gNodes = [], gLinks = [], gSvg, gSim, gZoom;
+
+function initGraph() {
+  state.graphInitialised = true;
+  const container = document.getElementById('d3-graph-container');
+  const W = container.clientWidth || 820;
+  const H = 580;
+  d3.select('#graph-svg').selectAll('*').remove();
+  gSvg = d3.select('#graph-svg').attr('width', W).attr('height', H);
+  const g = gSvg.append('g').attr('id', 'graph-g');
+  gZoom = d3.zoom().scaleExtent([0.3, 3]).on('zoom', (event) => g.attr('transform', event.transform));
+  gSvg.call(gZoom);
+  // Build nodes
+  gNodes = [{ id: 'project', type: 'project', label: state.projectName, radius: 28, color: '#FFC107', domain: null }];
+  gLinks = [];
+  DOMAINS.forEach(domain => {
+    const domNode = { id: 'domain-' + domain.id, type: 'domain', label: domain.label, radius: 20, color: domain.color, domain: domain.id, expanded: false };
+    gNodes.push(domNode);
+    gLinks.push({ source: 'project', target: 'domain-' + domain.id, type: 'project-domain', color: 'rgba(255,255,255,0.3)', distance: 140 });
+    const results = state.domainResults[domain.id] || [];
+    domain.questions.forEach((q, idx) => {
+      const conf = results[idx] ? results[idx].confidence : 0.3;
+      const qColor = conf >= 0.8 ? '#00A651' : conf >= 0.5 ? '#FFC107' : '#F26522';
+      gNodes.push({
+        id: `q-${domain.id}-${idx}`, type: 'question', label: q, radius: 8, color: qColor,
+        domain: domain.id, confidence: conf,
+        evidence: results[idx] ? results[idx].evidence : '',
+        gap: results[idx] ? results[idx].gap : '',
+        controls: results[idx] ? results[idx].controls : [],
+        standards: results[idx] ? results[idx].standards : [],
+        visible: false
+      });
+      gLinks.push({ source: 'domain-' + domain.id, target: `q-${domain.id}-${idx}`, type: 'domain-question', color: domain.color + '99', distance: 60 });
+    });
+  });
+  const nodeMap = {};
+  gNodes.forEach(n => nodeMap[n.id] = n);
+  gLinks.forEach(l => { l.source = nodeMap[l.source] || l.source; l.target = nodeMap[l.target] || l.target; });
+  const visLinks = gLinks.filter(l => l.type === 'project-domain');
+  const visNodes = gNodes.filter(n => n.type !== 'question');
+  gSim = d3.forceSimulation(visNodes)
+    .force('link', d3.forceLink(visLinks).id(d => d.id).distance(d => d.distance || 140).strength(0.7))
+    .force('charge', d3.forceManyBody().strength(-250))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collide', d3.forceCollide(d => d.radius + 20));
+  state.d3Simulation = gSim;
+  state.d3Zoom = gZoom;
+  state.d3Svg = gSvg;
+  renderGraph(g, visNodes, visLinks, W, H);
+  updateNodeCount();
+}
+
+function renderGraph(g, visNodes, visLinks, W, H) {
+  g.selectAll('.link').remove();
+  g.selectAll('.node-group').remove();
+  const link = g.selectAll('.link').data(visLinks).enter().append('line')
+    .attr('class', 'link').attr('stroke', d => d.color || 'rgba(255,255,255,0.3)')
+    .attr('stroke-width', 1.5).attr('stroke-opacity', 0.5);
+  const nodeGroup = g.selectAll('.node-group').data(visNodes).enter().append('g')
+    .attr('class', 'node-group').attr('cursor', 'pointer')
+    .call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended))
+    .on('click', (event, d) => { event.stopPropagation(); handleNodeClick(d); });
+  nodeGroup.append('circle')
+    .attr('r', d => d.radius)
+    .attr('fill', d => d.color)
+    .attr('fill-opacity', d => d.type === 'question' ? 0.85 : 0.95)
+    .attr('stroke', d => d.type === 'project' ? '#FFE082' : d.type === 'domain' ? 'rgba(255,255,255,0.3)' : 'none')
+    .attr('stroke-width', d => d.type === 'project' ? 3 : 1.5);
+  nodeGroup.filter(d => d.type !== 'question').append('text')
+    .attr('text-anchor', 'middle').attr('dy', d => d.type === 'project' ? '0.35em' : d.radius + 14)
+    .attr('font-size', d => d.type === 'project' ? '11px' : '10px')
+    .attr('font-weight', '600').attr('fill', '#E8F4FF')
+    .attr('pointer-events', 'none')
+    .text(d => d.label.length > 14 ? d.label.substring(0, 13) + '…' : d.label);
+  gSim.on('tick', () => {
+    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeGroup.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+}
+
+function handleNodeClick(d) {
+  if (d.type === 'domain') toggleDomainExpand(d.domain);
+  showNodeDetails(d);
+}
+
+function toggleDomainExpand(domainId) {
+  const isExpanded = state.expandedDomains.has(domainId);
+  if (isExpanded) { state.expandedDomains.delete(domainId); collapseOne(domainId); }
+  else { state.expandedDomains.add(domainId); expandOne(domainId); }
+  updateNodeCount();
+}
+
+function expandOne(domainId) {
+  const g = d3.select('#graph-g');
+  const domainNode = gNodes.find(n => n.id === 'domain-' + domainId);
+  const qNodes = gNodes.filter(n => n.type === 'question' && n.domain === domainId);
+  const qLinks = gLinks.filter(l => l.type === 'domain-question' && l.source.domain === domainId);
+  qNodes.forEach(n => {
+    n.visible = true; n.x = domainNode.x + (Math.random() - 0.5) * 60; n.y = domainNode.y + (Math.random() - 0.5) * 60;
+  });
+  const allVis = gNodes.filter(n => n.type !== 'question' || n.visible);
+  const allVisLinks = gLinks.filter(l => l.type === 'project-domain' || (l.type === 'domain-question' && (l.source.visible !== false) && state.expandedDomains.has(l.source.domain)));
+  gSim.nodes(allVis);
+  gSim.force('link').links(allVisLinks);
+  gSim.alpha(0.3).restart();
+  renderGraph(g, allVis, allVisLinks, parseInt(gSvg.attr('width')), parseInt(gSvg.attr('height')));
+  applyGraphFilters();
+}
+
+function collapseOne(domainId) {
+  const qNodes = gNodes.filter(n => n.type === 'question' && n.domain === domainId);
+  qNodes.forEach(n => { n.visible = false; });
+  const allVis = gNodes.filter(n => n.type !== 'question' || n.visible);
+  const allVisLinks = gLinks.filter(l => l.type === 'project-domain' || (l.type === 'domain-question' && state.expandedDomains.has(l.source.domain)));
+  const g = d3.select('#graph-g');
+  gSim.nodes(allVis);
+  gSim.force('link').links(allVisLinks);
+  gSim.alpha(0.3).restart();
+  renderGraph(g, allVis, allVisLinks, parseInt(gSvg.attr('width')), parseInt(gSvg.attr('height')));
+  applyGraphFilters();
+}
+
+function expandAllDomains() {
+  DOMAINS.forEach(d => { if (!state.expandedDomains.has(d.id)) { state.expandedDomains.add(d.id); gNodes.filter(n => n.type === 'question' && n.domain === d.id).forEach(n => n.visible = true); } });
+  rebuildGraphFull();
+}
+
+function collapseAllDomains() {
+  state.expandedDomains.clear();
+  gNodes.filter(n => n.type === 'question').forEach(n => n.visible = false);
+  rebuildGraphFull();
+}
+
+function rebuildGraphFull() {
+  const g = d3.select('#graph-g');
+  const allVis = gNodes.filter(n => n.type !== 'question' || n.visible);
+  const allVisLinks = gLinks.filter(l => l.type === 'project-domain' || (l.type === 'domain-question' && state.expandedDomains.has(l.source.domain)));
+  gSim.nodes(allVis);
+  gSim.force('link').links(allVisLinks);
+  gSim.alpha(0.5).restart();
+  renderGraph(g, allVis, allVisLinks, parseInt(gSvg.attr('width')), parseInt(gSvg.attr('height')));
+  applyGraphFilters();
+  updateNodeCount();
+}
+
+function applyGraphFilters() {
+  if (!state.graphInitialised) return;
+  const search = (document.getElementById('graph-search') || {}).value || '';
+  state.searchText = search.toLowerCase();
+  const riskFilter = state.riskFilter;
+  d3.selectAll('.node-group').each(function(d) {
+    if (!d) return;
+    let visible = true;
+    if (d.type === 'domain' && !state.activeDomainFilters.has(d.domain)) visible = false;
+    if (d.type === 'question' && !state.activeDomainFilters.has(d.domain)) visible = false;
+    if (riskFilter === 'gaps' && d.type === 'question' && d.confidence >= 0.5) visible = false;
+    if (riskFilter === 'strong' && d.type === 'question' && d.confidence < 0.8) visible = false;
+    if (state.searchText && !d.label.toLowerCase().includes(state.searchText) && d.type !== 'project') visible = false;
+    d3.select(this).attr('opacity', visible ? 1 : 0.15);
+  });
+  updateNodeCount();
+}
+
+function updateNodeCount() {
+  const el = document.getElementById('node-count');
+  if (!el) return;
+  const vis = gNodes.filter(n => n.type !== 'question' || n.visible).length;
+  el.textContent = vis + ' nodes shown';
+}
+
+function showNodeDetails(d) {
+  document.getElementById('node-details-empty').style.display = 'none';
+  const content = document.getElementById('node-details-content');
+  content.style.display = 'block';
+  const typeLabels = { project: 'Project', domain: 'Domain', question: 'Question' };
+  const typeColors = { project: 'var(--sun)', domain: d.color, question: d.color };
+  const confPct = d.confidence !== undefined ? Math.round(d.confidence * 100) : null;
+  const confColor = d.confidence >= 0.8 ? '#00A651' : d.confidence >= 0.5 ? '#FFC107' : '#F26522';
+  let html = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+      <span style="background:${typeColors[d.type] || 'var(--sky)'};color:#000;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;">${typeLabels[d.type] || d.type}</span>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--text-primary);line-height:1.5;margin-bottom:12px;">${escHtml(d.label)}</div>
+  `;
+  if (d.domain) {
+    const dom = DOMAINS.find(x => x.id === d.domain);
+    if (dom) html += `<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;"><span style="width:8px;height:8px;border-radius:50%;background:${dom.color};display:inline-block;margin-right:5px;"></span>${dom.label}</div>`;
+  }
+  if (confPct !== null) {
+    html += `<div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Confidence</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="conf-bar" style="flex:1;"><div class="conf-fill" style="width:${confPct}%;background:${confColor};"></div></div>
+        <span style="font-size:13px;font-weight:700;color:${confColor};">${confPct}%</span>
+      </div>
+    </div>`;
+  }
+  if (d.evidence) html += `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">Evidence</div><p style="font-size:12px;line-height:1.5;margin:0;color:var(--text-primary);">${escHtml(d.evidence)}</p></div>`;
+  if (d.gap) html += `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">Gap</div><p style="font-size:12px;line-height:1.5;margin:0;color:var(--text-primary);">${escHtml(d.gap)}</p></div>`;
+  if (d.controls && d.controls.length) {
+    html += `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">Controls</div><ul style="margin:0;padding-left:14px;font-size:12px;line-height:1.7;color:var(--text-primary);">${d.controls.map(c => `<li>${escHtml(c)}</li>`).join('')}</ul></div>`;
+  }
+  if (d.standards && d.standards.length) {
+    html += `<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Standards</div>${d.standards.map(s => `<span style="background:rgba(66,165,245,0.12);color:var(--sky-light);padding:2px 8px;border-radius:10px;font-size:11px;margin-right:3px;margin-bottom:3px;display:inline-block;">${escHtml(s)}</span>`).join('')}</div>`;
+  }
+  content.innerHTML = html;
+}
+
+function dragstarted(event, d) { if (!event.active) gSim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
+function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+function dragended(event, d) { if (!event.active) gSim.alphaTarget(0); d.fx = null; d.fy = null; }
+function zoomIn() { gSvg && gSvg.transition().duration(300).call(gZoom.scaleBy, 1.4); }
+function zoomOut() { gSvg && gSvg.transition().duration(300).call(gZoom.scaleBy, 0.7); }
+function resetZoom() { gSvg && gSvg.transition().duration(400).call(gZoom.transform, d3.zoomIdentity); }
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 </script>
 </body>
