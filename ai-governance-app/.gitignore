@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+node_modules/
+dist/
+.vite/
+uploads/
+*.pdf
+!backend/app/templates/report.html
+neo4j/data/
+neo4j/logs/

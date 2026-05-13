@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Governance Gap Report — {{ project_name }}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Inter, sans-serif; font-size: 11px; color: #1e293b; background: #fff; }
+
+  .cover { page-break-after: always; background: #0f172a; color: #fff; padding: 60px 50px; min-height: 100vh; }
+  .cover h1 { font-size: 28px; font-weight: 700; margin-bottom: 10px; }
+  .cover .subtitle { font-size: 14px; color: #94a3b8; margin-bottom: 40px; }
+  .cover .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 40px; }
+  .cover .meta-item { background: rgba(255,255,255,0.08); padding: 16px 20px; border-radius: 8px; }
+  .cover .meta-item .label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+  .cover .meta-item .value { font-size: 18px; font-weight: 700; margin-top: 4px; }
+  .cover .rai-score { font-size: 48px; font-weight: 700; }
+
+  .risk-critical { color: #ef4444; }
+  .risk-high     { color: #f97316; }
+  .risk-medium   { color: #f59e0b; }
+  .risk-low      { color: #22c55e; }
+
+  .badge-critical { background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+  .badge-high     { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+  .badge-medium   { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+  .badge-low      { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+  .badge-na       { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+
+  .page { padding: 40px 50px; }
+  h2 { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+  h3 { font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 8px; }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 30px; }
+  .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; }
+  .summary-card .num { font-size: 28px; font-weight: 700; }
+  .summary-card .lbl { font-size: 10px; color: #64748b; margin-top: 4px; }
+
+  .domain-bar { margin-bottom: 12px; }
+  .domain-bar .row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .domain-bar .name { width: 180px; font-size: 10px; }
+  .domain-bar .track { flex: 1; background: #e2e8f0; border-radius: 4px; height: 10px; }
+  .domain-bar .fill { height: 10px; border-radius: 4px; }
+  .domain-bar .pct { width: 36px; font-size: 10px; text-align: right; }
+
+  .gap-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; }
+  .gap-table th { background: #0f172a; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
+  .gap-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+  .gap-table tr:nth-child(even) td { background: #f8fafc; }
+
+  .controls-list { list-style: none; }
+  .controls-list li::before { content: "→ "; color: #6366f1; }
+
+  .strengths-list { list-style: none; }
+  .strengths-list li { padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+  .strengths-list li::before { content: "✓ "; color: #22c55e; font-weight: 700; }
+
+  .next-steps { counter-reset: step; }
+  .next-steps li { counter-increment: step; display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+  .next-steps li::before { content: counter(step); background: #6366f1; color: #fff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+
+  .footer { font-size: 9px; color: #94a3b8; text-align: center; margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+
+  @page { margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div class="cover">
+  <div style="font-size:11px; color:#6366f1; font-weight:600; margin-bottom:8px;">AI GOVERNANCE MAPPING TOOL</div>
+  <h1>Governance Gap Report</h1>
+  <div class="subtitle">{{ project_name }}</div>
+  <div class="subtitle">Generated {{ generated_at }}</div>
+
+  <div class="meta-grid">
+    <div class="meta-item">
+      <div class="label">RAI Risk Score</div>
+      <div class="value rai-score risk-{{ risk_tier }}">{{ rai_score | int }}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Risk Tier</div>
+      <div class="value risk-{{ risk_tier }}">{{ risk_tier | upper }}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Governance Coverage</div>
+      <div class="value">{{ coverage_pct }}%</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Gaps Identified</div>
+      <div class="value risk-high">{{ gap_count }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- EXECUTIVE SUMMARY -->
+<div class="page">
+  <h2>Executive Summary</h2>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="num">{{ total_questions }}</div>
+      <div class="lbl">Total Requirements</div>
+    </div>
+    <div class="summary-card">
+      <div class="num" style="color:#22c55e;">{{ total_questions - gap_count }}</div>
+      <div class="lbl">Requirements Met</div>
+    </div>
+    <div class="summary-card">
+      <div class="num" style="color:#ef4444;">{{ gap_count }}</div>
+      <div class="lbl">Gaps Found</div>
+    </div>
+    <div class="summary-card">
+      <div class="num">{{ coverage_pct }}%</div>
+      <div class="lbl">Coverage</div>
+    </div>
+  </div>
+
+  <h3>Domain Coverage</h3>
+  {% for domain, score in domain_scores.items() %}
+  <div class="domain-bar">
+    <div class="row">
+      <div class="name">{{ domain }}</div>
+      <div class="track">
+        <div class="fill" style="width:{{ (score * 100) | int }}%; background:{% if score >= 0.8 %}#22c55e{% elif score >= 0.5 %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+      </div>
+      <div class="pct">{{ (score * 100) | int }}%</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- GAPS TABLE -->
+<div class="page">
+  <h2>Governance Gaps</h2>
+  <table class="gap-table">
+    <thead>
+      <tr>
+        <th style="width:20%">Domain</th>
+        <th style="width:30%">Requirement</th>
+        <th style="width:10%">Coverage</th>
+        <th style="width:10%">Risk</th>
+        <th style="width:30%">Gap / Next Steps</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for gap in gaps %}
+      <tr>
+        <td>{{ gap.domain }}</td>
+        <td>{{ gap.question_text[:120] }}{% if gap.question_text|length > 120 %}...{% endif %}</td>
+        <td>{{ gap.confidence | confidence_pct }}</td>
+        <td><span class="{{ gap.risk_rating | risk_badge }}">{{ gap.risk_rating }}</span></td>
+        <td>
+          {{ gap.gap_description[:150] if gap.gap_description else '—' }}
+          {% if gap.controls %}
+          <ul class="controls-list">
+            {% for c in gap.controls[:2] %}<li>{{ c[:80] }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- STRENGTHS -->
+<div class="page">
+  <h2>Areas of Strength</h2>
+  <ul class="strengths-list">
+    {% for s in strengths %}
+    <li>{{ s }}</li>
+    {% endfor %}
+  </ul>
+
+  <br>
+  <h2>Recommended Next Steps</h2>
+  <ol class="next-steps">
+    {% for step in next_steps %}
+    <li>{{ step }}</li>
+    {% endfor %}
+  </ol>
+
+  <div class="footer">
+    Assessment ID: {{ assessment_id }} &nbsp;|&nbsp;
+    Generated by AI Governance Mapping Tool &nbsp;|&nbsp;
+    For internal use only
+  </div>
+</div>
+
+</body>
+</html>
