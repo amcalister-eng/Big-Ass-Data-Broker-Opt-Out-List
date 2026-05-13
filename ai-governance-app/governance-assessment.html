@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Governance Assessment</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+  .btn-primary { background: #6366f1; color: white; border-radius: 8px; padding: 10px 20px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  .btn-primary:hover { background: #4f46e5; }
+  .btn-primary:disabled { background: #475569; cursor: not-allowed; }
+  .bar-bg { background: #334155; border-radius: 4px; height: 8px; }
+  .bar-fill { height: 8px; border-radius: 4px; transition: width 1s ease; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 9999px; font-weight: 500; }
+  details summary { cursor: pointer; list-style: none; }
+  details summary::-webkit-details-marker { display: none; }
+  .spinner { border: 3px solid #334155; border-top-color: #6366f1; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .progress-step { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 14px; color: #94a3b8; }
+  .progress-step.done { color: #22c55e; }
+  .progress-step.active { color: #e2e8f0; }
+  .risk-critical { background: #450a0a; color: #fca5a5; }
+  .risk-high { background: #431407; color: #fdba74; }
+  .risk-medium { background: #422006; color: #fcd34d; }
+  .risk-low { background: #052e16; color: #86efac; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- SETUP SCREEN -->
+<div id="screen-setup" class="max-w-2xl mx-auto px-4 py-16">
+  <div class="text-center mb-10">
+    <div class="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 rounded-full px-4 py-1 text-indigo-400 text-sm mb-4">
+      AI Governance Assessment Tool
+    </div>
+    <h1 class="text-4xl font-bold text-white mb-3">Governance Gap Analysis</h1>
+    <p class="text-slate-400 text-lg">Analyse your AI project against 100+ governance questions across 10 risk domains</p>
+  </div>
+
+  <div class="card p-6 space-y-5">
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-2">Anthropic API Key <span class="text-red-400">*</span></label>
+      <input id="api-key" type="password" placeholder="sk-ant-..." class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+      <p class="text-xs text-slate-500 mt-1">Never stored — used only for this session in your browser. Get one at console.anthropic.com</p>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-2">Project Name <span class="text-red-400">*</span></label>
+      <input id="project-name" type="text" placeholder="e.g. Customer Churn Prediction Model" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-2">Project Description <span class="text-red-400">*</span></label>
+      <textarea id="project-desc" rows="8" placeholder="Paste your project proposal, technical design document, or description here. Include details about: what the AI does, what data it uses, who it affects, how decisions are made, and any third-party components..." class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+      <p class="text-xs text-slate-500 mt-1">The more detail you provide, the more accurate the analysis</p>
+    </div>
+
+    <button id="btn-start" class="btn-primary w-full text-center py-3 text-base" onclick="startAssessment()">
+      Run Assessment →
+    </button>
+    <p id="setup-error" class="text-red-400 text-sm hidden"></p>
+  </div>
+
+  <div class="mt-8 grid grid-cols-2 gap-4 text-sm text-slate-400">
+    <div class="card p-4">
+      <div class="text-indigo-400 font-semibold mb-1">10 Risk Domains</div>
+      Privacy, Supplier, Agentic AI, Cyber, Ethics, Model Risk, Data Governance, Operational, Regulatory, ARB
+    </div>
+    <div class="card p-4">
+      <div class="text-indigo-400 font-semibold mb-1">Standards Mapped</div>
+      EU AI Act, ISO 42001, NIST AI RMF, CIS8, Australian Privacy Act
+    </div>
+    <div class="card p-4">
+      <div class="text-indigo-400 font-semibold mb-1">RAI Scorecard</div>
+      Numeric risk scoring with ADRB and AI Council thresholds
+    </div>
+    <div class="card p-4">
+      <div class="text-indigo-400 font-semibold mb-1">Gap Report</div>
+      Controls, governance patterns, and standards references per gap
+    </div>
+  </div>
+</div>
+
+<!-- ANALYSIS SCREEN -->
+<div id="screen-analysis" class="max-w-2xl mx-auto px-4 py-16 hidden">
+  <div class="text-center mb-10">
+    <h2 class="text-2xl font-bold text-white mb-2">Analysing project…</h2>
+    <p class="text-slate-400">Claude is reviewing your project against all governance domains</p>
+  </div>
+  <div class="card p-8">
+    <div id="progress-steps" class="space-y-1"></div>
+    <div class="mt-6">
+      <div class="bar-bg">
+        <div id="progress-bar" class="bar-fill bg-indigo-500" style="width:0%"></div>
+      </div>
+      <p id="progress-label" class="text-xs text-slate-400 mt-2 text-right">0%</p>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS SCREEN -->
+<div id="screen-results" class="max-w-5xl mx-auto px-4 py-10 hidden">
+
+  <!-- Header -->
+  <div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <div>
+      <p class="text-slate-400 text-sm mb-1">AI Governance Assessment</p>
+      <h1 id="result-project-name" class="text-3xl font-bold text-white"></h1>
+    </div>
+    <div class="flex gap-3 flex-wrap">
+      <div id="rai-badge" class="card px-5 py-3 text-center">
+        <div class="text-xs text-slate-400 mb-1">RAI Score</div>
+        <div id="rai-score-val" class="text-2xl font-bold"></div>
+      </div>
+      <div id="tier-badge" class="card px-5 py-3 text-center">
+        <div class="text-xs text-slate-400 mb-1">Risk Tier</div>
+        <div id="tier-val" class="text-2xl font-bold"></div>
+      </div>
+      <div id="coverage-badge" class="card px-5 py-3 text-center">
+        <div class="text-xs text-slate-400 mb-1">Coverage</div>
+        <div id="coverage-val" class="text-2xl font-bold text-indigo-400"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Review Required Banners -->
+  <div id="banners" class="space-y-2 mb-6"></div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 mb-6 bg-slate-800 rounded-lg p-1 w-fit">
+    <button onclick="showTab('domains')" id="tab-domains" class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white">Domain Coverage</button>
+    <button onclick="showTab('gaps')" id="tab-gaps" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white">Gaps &amp; Actions</button>
+    <button onclick="showTab('rai')" id="tab-rai" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white">RAI Factors</button>
+  </div>
+
+  <!-- DOMAINS TAB -->
+  <div id="tab-content-domains">
+    <div id="domains-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+  </div>
+
+  <!-- GAPS TAB -->
+  <div id="tab-content-gaps" class="hidden">
+    <p class="text-slate-400 text-sm mb-4">Questions where coverage is below 80% — ordered by risk. Click a row to see recommended actions.</p>
+    <div id="gaps-list" class="space-y-2"></div>
+    <div id="no-gaps" class="hidden card p-8 text-center text-green-400">
+      <div class="text-4xl mb-2">✓</div>
+      <div class="font-semibold">No significant gaps found</div>
+      <div class="text-slate-400 text-sm mt-1">All questions scored above 80% confidence</div>
+    </div>
+  </div>
+
+  <!-- RAI TAB -->
+  <div id="tab-content-rai" class="hidden">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="card p-5">
+        <h3 class="font-semibold text-red-400 mb-3">Risk Factors Triggered</h3>
+        <div id="rai-triggered" class="space-y-2 text-sm"></div>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-semibold text-green-400 mb-3">Mitigating Factors</h3>
+        <div id="rai-mitigating" class="space-y-2 text-sm"></div>
+      </div>
+    </div>
+    <div class="card p-5 mt-4">
+      <h3 class="font-semibold text-slate-300 mb-2">Score Breakdown</h3>
+      <p id="rai-explanation" class="text-sm text-slate-400"></p>
+    </div>
+  </div>
+
+  <button onclick="location.reload()" class="mt-8 text-sm text-slate-400 hover:text-white underline">← New assessment</button>
+</div>
+
+<script>
+// ── Questions ──────────────────────────────────────────────────────────────
+const DOMAINS = [
+  {
+    id: "privacy", name: "Privacy & PIA", color: "#6366f1",
+    questions: [
+      "Has a Privacy Impact Assessment (PIA) been completed or scheduled for this project?",
+      "Does the project collect, process, or store personal information as defined under the Privacy Act?",
+      "Have data minimisation principles been applied — only collecting what is strictly necessary?",
+      "Is there a lawful basis identified for each type of personal data processed?",
+      "Are individuals informed about how their data is used through appropriate notices?",
+      "Is there a data retention and deletion schedule in place for personal data?",
+      "Has cross-border data transfer been assessed for compliance with privacy legislation?",
+      "Are subject access and correction rights supported in the system design?",
+      "Has a Data Protection Officer or privacy advisor reviewed this project?",
+      "Are consent mechanisms implemented where required, and are they freely given, specific, and revocable?"
+    ]
+  },
+  {
+    id: "supplier", name: "Supplier & Third Party", color: "#8b5cf6",
+    questions: [
+      "Have all third-party AI components, APIs, and models been identified and documented?",
+      "Is there a vendor risk assessment process covering AI-specific risks for all suppliers?",
+      "Do supplier contracts include AI governance, data handling, and audit rights clauses?",
+      "Has the provenance and licensing of training data from third parties been verified?",
+      "Are there exit strategies and data portability provisions if a vendor relationship ends?",
+      "Is there ongoing monitoring of third-party model updates that could affect system behaviour?",
+      "Have supply chain security controls been applied to all AI components and dependencies?",
+      "Are third-party AI systems tested in your environment before production deployment?",
+      "Is there a process to assess fourth-party (sub-supplier) AI risks?",
+      "Are SLAs in place that cover AI-specific performance, availability, and bias thresholds?"
+    ]
+  },
+  {
+    id: "agentic", name: "Agentic AI", color: "#ec4899",
+    questions: [
+      "Does the system operate autonomously or take actions without human approval for each step?",
+      "Are there defined boundaries on what actions the agent can take and what resources it can access?",
+      "Is there a human-in-the-loop checkpoint before high-stakes or irreversible actions are executed?",
+      "Are agent actions logged in sufficient detail to reconstruct the reasoning behind each decision?",
+      "Is there a kill switch or emergency stop mechanism that can halt agent activity immediately?",
+      "Has the blast radius of agent mistakes been assessed and bounded through sandboxing or permissions?",
+      "Are there rate limits and cost controls to prevent runaway agent execution?",
+      "Has prompt injection and adversarial input testing been performed on the agent?",
+      "Is the agent's goal specification robust against misinterpretation or Goodhart's Law gaming?",
+      "Are multi-agent interaction risks assessed when this agent operates alongside other agents?"
+    ]
+  },
+  {
+    id: "cyber", name: "Cyber Security", color: "#f59e0b",
+    questions: [
+      "Has a threat model been completed specifically for the AI components of this system?",
+      "Are model weights, training data, and inference endpoints protected against unauthorised access?",
+      "Has adversarial robustness testing (e.g. adversarial examples, model inversion) been performed?",
+      "Are there controls against model theft, extraction attacks, and intellectual property exposure?",
+      "Is data poisoning risk assessed and mitigated for training and fine-tuning pipelines?",
+      "Are API endpoints rate-limited and authenticated to prevent abuse?",
+      "Is there a vulnerability disclosure and patching process for AI-specific CVEs?",
+      "Are secrets (API keys, model credentials) managed through a secrets manager, not hardcoded?",
+      "Has penetration testing been performed on the AI system and its supporting infrastructure?",
+      "Are CIS8 controls applied to the infrastructure hosting the AI system?"
+    ]
+  },
+  {
+    id: "ethics", name: "Ethics & Fairness", color: "#22c55e",
+    questions: [
+      "Has a bias and fairness assessment been completed across protected characteristics?",
+      "Are fairness metrics defined, measured, and monitored in production?",
+      "Has the system been tested for disparate impact on vulnerable or marginalised groups?",
+      "Are there processes to receive and act on complaints about unfair or discriminatory outcomes?",
+      "Has an ethics review been completed by a diverse team or ethics board?",
+      "Is the system's purpose aligned with the organisation's AI ethics principles and values?",
+      "Are there guardrails preventing the system from being used for harmful or unethical purposes?",
+      "Has the environmental impact of model training and inference been assessed?",
+      "Are there controls to prevent the system reinforcing harmful social stereotypes?",
+      "Is there a human rights impact assessment for high-risk or externally deployed systems?"
+    ]
+  },
+  {
+    id: "model_risk", name: "Model Risk", color: "#0ea5e9",
+    questions: [
+      "Is there a model card or equivalent documentation covering the model's purpose, limitations, and performance?",
+      "Has the model been validated on out-of-distribution and edge-case data?",
+      "Are model performance metrics monitored in production with alerting on degradation?",
+      "Is there a defined process for model retraining, versioning, and rollback?",
+      "Has concept drift and data drift detection been implemented?",
+      "Are model explainability and interpretability requirements defined and met?",
+      "Is there a champion-challenger or A/B testing framework for model updates?",
+      "Has the model been stress-tested under peak load and adversarial conditions?",
+      "Are uncertainty estimates or confidence scores provided with model outputs?",
+      "Is there independent model validation by a party separate from the development team?"
+    ]
+  },
+  {
+    id: "data_governance", name: "Data Governance", color: "#14b8a6",
+    questions: [
+      "Is there a data lineage record covering all data used in training, validation, and inference?",
+      "Has the quality, completeness, and representativeness of training data been assessed?",
+      "Are data access controls enforced based on least-privilege principles?",
+      "Is there a data catalogue entry for all datasets used by this AI system?",
+      "Are data quality checks automated in the ingestion and preprocessing pipeline?",
+      "Has the risk of training data leakage through model outputs been assessed?",
+      "Is synthetic data use documented with its limitations and generation methodology?",
+      "Are data sharing agreements in place for all externally sourced datasets?",
+      "Is there a process to handle data corrections that may require model retraining?",
+      "Are data governance policies enforced technically, not just as policy documents?"
+    ]
+  },
+  {
+    id: "operational", name: "Operational Risk", color: "#f97316",
+    questions: [
+      "Is there a runbook covering common failure scenarios and their remediation steps?",
+      "Are business continuity and disaster recovery plans updated for this AI system?",
+      "Is there a defined process for human escalation when the AI system cannot handle a case?",
+      "Are operational metrics (latency, throughput, error rates) monitored with SLAs?",
+      "Is there a change management process covering model and configuration updates?",
+      "Has the system been load-tested to confirm it meets peak demand requirements?",
+      "Are there circuit breakers to degrade gracefully when dependent services fail?",
+      "Is there an incident response plan specific to AI system failures or unexpected behaviour?",
+      "Are on-call responsibilities and escalation paths documented for AI system issues?",
+      "Is there a post-incident review process that feeds back into risk assessments?"
+    ]
+  },
+  {
+    id: "regulatory", name: "Regulatory & Legal", color: "#a855f7",
+    questions: [
+      "Has a regulatory landscape assessment been completed for all jurisdictions where the system will operate?",
+      "Does the system comply with EU AI Act requirements for its risk classification?",
+      "Are there legal opinions on the use of training data under copyright and IP law?",
+      "Is there a compliance register mapping each regulatory requirement to a specific control?",
+      "Has the system been assessed against sector-specific regulations (e.g. financial services, health)?",
+      "Are there processes to monitor and respond to changes in AI regulation?",
+      "Is there legal review of all user-facing outputs to identify defamation or misleading information risks?",
+      "Has the system been assessed against consumer protection laws in all target markets?",
+      "Are there contractual liability clauses that reflect AI-specific risks in customer agreements?",
+      "Is there a record of regulatory consultations or pre-approval engagements where required?"
+    ]
+  },
+  {
+    id: "arb", name: "ARB / Agentic Review", color: "#64748b",
+    questions: [
+      "Has the business problem been clearly articulated and validated prior to selecting an AI solution?",
+      "Have non-AI alternatives been evaluated and documented as part of the solution selection process?",
+      "Is there a defined success metric and measurement plan for this AI initiative?",
+      "Has the project been reviewed and approved by the Architecture Review Board?",
+      "Is the AI system built on approved and supported platforms within the organisation's architecture?",
+      "Are the data sources used by this system approved and catalogued in the enterprise data inventory?",
+      "Has a RAG (Retrieval Augmented Generation) architecture review been completed if applicable?",
+      "Are there controls to prevent hallucination outputs from being presented as factual to end users?",
+      "Have security controls been reviewed and approved by the Security Architecture team?",
+      "Is there a user experience review ensuring AI outputs are presented transparently and not misleadingly?",
+      "Has the total cost of ownership including inference costs been modelled and approved?",
+      "Is there a defined process for ongoing model evaluation and replacement as better options emerge?",
+      "Has the project been through an AI Council or equivalent governance gate?",
+      "Are there defined escalation paths when the AI system produces unexpected or harmful outputs?"
+    ]
+  }
+];
+
+const RAI_FACTORS = [
+  { id: "legal_effect", label: "Legal or significant effect on individuals", weight: 10 },
+  { id: "high_autonomy", label: "High autonomy — minimal human oversight", weight: 10 },
+  { id: "biometrics", label: "Processes biometric or health data", weight: 5 },
+  { id: "sensitive_data", label: "Processes sensitive personal data", weight: 4 },
+  { id: "vulnerable_cohorts", label: "Affects vulnerable cohorts (minors, elderly, disadvantaged)", weight: 4 },
+  { id: "large_scale", label: "Large scale deployment (>10,000 people)", weight: 3 },
+  { id: "novel_tech", label: "Novel or experimental technology", weight: 3 },
+  { id: "external_customers", label: "Directly interacts with external customers", weight: 2 },
+  { id: "third_party", label: "Relies on critical third-party AI components", weight: 2 },
+  { id: "real_time", label: "Makes real-time decisions without review", weight: 2 },
+];
+
+const RAI_MITIGATIONS = [
+  { id: "human_loop", label: "Human-in-the-loop for all consequential decisions", weight: -2 },
+  { id: "poc_only", label: "Proof of concept — not in production", weight: -1 },
+  { id: "internal_only", label: "Internal use only — no external exposure", weight: -1 },
+  { id: "existing_approval", label: "Existing governance approval already obtained", weight: -1 },
+];
+
+// ── State ─────────────────────────────────────────────────────────────────
+let results = { domains: [], gaps: [], rai: null, projectName: "" };
+
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function show(id) { document.getElementById(id).classList.remove("hidden"); }
+function hide(id) { document.getElementById(id).classList.add("hidden"); }
+function showTab(name) {
+  ["domains","gaps","rai"].forEach(t => {
+    document.getElementById("tab-content-"+t).classList.add("hidden");
+    document.getElementById("tab-"+t).className = "tab-btn px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white";
+  });
+  show("tab-content-"+name);
+  document.getElementById("tab-"+name).className = "tab-btn px-4 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white";
+}
+
+function confColor(c) {
+  if (c >= 0.8) return "#22c55e";
+  if (c >= 0.5) return "#f59e0b";
+  return "#ef4444";
+}
+function confLabel(c) {
+  if (c >= 0.8) return "Strong";
+  if (c >= 0.5) return "Partial";
+  return "Gap";
+}
+function riskTierClass(tier) {
+  if (tier === "critical") return "risk-critical";
+  if (tier === "high") return "risk-high";
+  if (tier === "medium") return "risk-medium";
+  return "risk-low";
+}
+
+// ── Anthropic API call ─────────────────────────────────────────────────────
+async function callClaude(apiKey, messages, systemPrompt) {
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages,
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API error ${resp.status}`);
+  }
+  const data = await resp.json();
+  return data.content[0].text;
+}
+
+// ── Assessment logic ───────────────────────────────────────────────────────
+async function startAssessment() {
+  const apiKey = document.getElementById("api-key").value.trim();
+  const projectName = document.getElementById("project-name").value.trim();
+  const projectDesc = document.getElementById("project-desc").value.trim();
+  const errEl = document.getElementById("setup-error");
+
+  if (!apiKey || !apiKey.startsWith("sk-")) { errEl.textContent = "Please enter a valid Anthropic API key."; errEl.classList.remove("hidden"); return; }
+  if (!projectName) { errEl.textContent = "Please enter a project name."; errEl.classList.remove("hidden"); return; }
+  if (projectDesc.length < 50) { errEl.textContent = "Please provide a more detailed project description (at least 50 characters)."; errEl.classList.remove("hidden"); return; }
+  errEl.classList.add("hidden");
+
+  results.projectName = projectName;
+  hide("screen-setup");
+  show("screen-analysis");
+
+  const steps = document.getElementById("progress-steps");
+  steps.innerHTML = "";
+  const allSteps = [...DOMAINS.map(d => d.name), "RAI Scorecard"];
+  allSteps.forEach((s, i) => {
+    steps.innerHTML += `<div class="progress-step" id="step-${i}"><span id="step-icon-${i}">○</span> ${s}</div>`;
+  });
+
+  try {
+    const domainResults = [];
+    for (let i = 0; i < DOMAINS.length; i++) {
+      const domain = DOMAINS[i];
+      document.getElementById("step-"+i).className = "progress-step active";
+      document.getElementById("step-icon-"+i).innerHTML = '<span class="spinner"></span>';
+
+      const qList = domain.questions.map((q, j) => `Q${j+1}: ${q}`).join("\n");
+      const systemPrompt = `You are an AI governance expert. Analyse the project description and rate coverage for each question.
+Return ONLY valid JSON — no markdown, no explanation. Format:
+{"questions":[{"id":1,"confidence":0.0,"evidence":"brief evidence from the text or 'Not addressed'","gap":"one-sentence gap description if confidence < 0.8, else null"},...]}
+Confidence scale: 1.0=fully addressed, 0.7=partially, 0.4=mentioned but insufficient, 0.1=not addressed.`;
+
+      const userMsg = `Project: ${projectName}\n\nDescription:\n${projectDesc}\n\nDomain: ${domain.name}\nQuestions:\n${qList}`;
+
+      let parsed;
+      try {
+        const raw = await callClaude(apiKey, [{ role: "user", content: userMsg }], systemPrompt);
+        const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        parsed = JSON.parse(cleaned);
+      } catch (e) {
+        parsed = { questions: domain.questions.map((_, j) => ({ id: j+1, confidence: 0.3, evidence: "Parse error", gap: "Unable to analyse" })) };
+      }
+
+      const qResults = (parsed.questions || []).map((r, j) => ({
+        domain: domain.name,
+        domainId: domain.id,
+        question: domain.questions[j] || "",
+        confidence: Math.max(0, Math.min(1, r.confidence || 0)),
+        evidence: r.evidence || "",
+        gap: r.gap || null,
+      }));
+
+      const avgConf = qResults.reduce((s, q) => s + q.confidence, 0) / qResults.length;
+      domainResults.push({ ...domain, avgConf, questions: qResults });
+
+      document.getElementById("step-"+i).className = "progress-step done";
+      document.getElementById("step-icon-"+i).textContent = "✓";
+      const pct = Math.round(((i+1) / allSteps.length) * 100);
+      document.getElementById("progress-bar").style.width = pct + "%";
+      document.getElementById("progress-label").textContent = pct + "%";
+    }
+
+    // RAI Scorecard
+    const raiStepIdx = DOMAINS.length;
+    document.getElementById("step-"+raiStepIdx).className = "progress-step active";
+    document.getElementById("step-icon-"+raiStepIdx).innerHTML = '<span class="spinner"></span>';
+
+    const raiFactorList = RAI_FACTORS.map(f => `- ${f.label} (weight: +${f.weight})`).join("\n");
+    const raiMitList = RAI_MITIGATIONS.map(f => `- ${f.label} (weight: ${f.weight})`).join("\n");
+    const raiSystem = `You are an AI risk assessor. Identify which risk factors apply to this project.
+Return ONLY valid JSON: {"triggered":["factor label",...], "mitigating":["factor label",...], "reasoning":"2 sentence explanation"}`;
+    const raiUser = `Project: ${projectName}\n\n${projectDesc}\n\nRisk factors to check:\n${raiFactorList}\n\nMitigating factors to check:\n${raiMitList}`;
+
+    let raiData = { triggered: [], mitigating: [], reasoning: "" };
+    try {
+      const raiRaw = await callClaude(apiKey, [{ role: "user", content: raiUser }], raiSystem);
+      const raiCleaned = raiRaw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      raiData = JSON.parse(raiCleaned);
+    } catch (e) { /* use defaults */ }
+
+    let raiScore = 0;
+    const triggeredFactors = RAI_FACTORS.filter(f => (raiData.triggered || []).some(t => t.toLowerCase().includes(f.label.toLowerCase().slice(0, 15))));
+    const mitigatingFactors = RAI_MITIGATIONS.filter(f => (raiData.mitigating || []).some(m => m.toLowerCase().includes(f.label.toLowerCase().slice(0, 15))));
+    triggeredFactors.forEach(f => raiScore += f.weight);
+    mitigatingFactors.forEach(f => raiScore += f.weight);
+    raiScore = Math.max(0, raiScore);
+    const raiTier = raiScore >= 15 ? "critical" : raiScore >= 8 ? "high" : raiScore >= 4 ? "medium" : "low";
+
+    document.getElementById("step-"+raiStepIdx).className = "progress-step done";
+    document.getElementById("step-icon-"+raiStepIdx).textContent = "✓";
+    document.getElementById("progress-bar").style.width = "100%";
+    document.getElementById("progress-label").textContent = "100%";
+
+    results.domains = domainResults;
+    results.gaps = domainResults.flatMap(d => d.questions.filter(q => q.confidence < 0.8)).sort((a, b) => a.confidence - b.confidence);
+    results.rai = { score: raiScore, tier: raiTier, triggered: triggeredFactors, mitigating: mitigatingFactors, reasoning: raiData.reasoning || "", requiresAdrb: raiScore >= 8, requiresAiCouncil: raiScore >= 15 };
+
+    await new Promise(r => setTimeout(r, 600));
+    renderResults();
+
+  } catch (err) {
+    hide("screen-analysis");
+    show("screen-setup");
+    document.getElementById("setup-error").textContent = "Error: " + err.message;
+    document.getElementById("setup-error").classList.remove("hidden");
+  }
+}
+
+// ── Render results ─────────────────────────────────────────────────────────
+function renderResults() {
+  hide("screen-analysis");
+  show("screen-results");
+
+  document.getElementById("result-project-name").textContent = results.projectName;
+
+  const rai = results.rai;
+  document.getElementById("rai-score-val").textContent = rai.score;
+  document.getElementById("rai-score-val").className = "text-2xl font-bold " + (rai.tier === "critical" ? "text-red-400" : rai.tier === "high" ? "text-orange-400" : rai.tier === "medium" ? "text-yellow-400" : "text-green-400");
+  document.getElementById("tier-val").textContent = rai.tier.charAt(0).toUpperCase() + rai.tier.slice(1);
+  document.getElementById("tier-val").className = "text-2xl font-bold " + (rai.tier === "critical" ? "text-red-400" : rai.tier === "high" ? "text-orange-400" : rai.tier === "medium" ? "text-yellow-400" : "text-green-400");
+
+  const totalQ = results.domains.reduce((s, d) => s + d.questions.length, 0);
+  const coveredQ = results.domains.reduce((s, d) => s + d.questions.filter(q => q.confidence >= 0.8).length, 0);
+  const coveragePct = Math.round((coveredQ / totalQ) * 100);
+  document.getElementById("coverage-val").textContent = coveragePct + "%";
+
+  // Banners
+  const banners = document.getElementById("banners");
+  banners.innerHTML = "";
+  if (rai.requiresAiCouncil) banners.innerHTML += `<div class="card p-3 flex items-center gap-3 border-red-500/50"><span class="text-red-400 text-lg">⚠</span><div><span class="font-semibold text-red-400">AI Council Review Required</span> <span class="text-slate-400 text-sm">— RAI score ${rai.score} exceeds critical threshold (≥15)</span></div></div>`;
+  if (rai.requiresAdrb && !rai.requiresAiCouncil) banners.innerHTML += `<div class="card p-3 flex items-center gap-3 border-orange-500/50"><span class="text-orange-400 text-lg">⚠</span><div><span class="font-semibold text-orange-400">ADRB Review Required</span> <span class="text-slate-400 text-sm">— RAI score ${rai.score} exceeds high threshold (≥8)</span></div></div>`;
+
+  // Domains
+  const grid = document.getElementById("domains-grid");
+  grid.innerHTML = "";
+  results.domains.forEach(d => {
+    const pct = Math.round(d.avgConf * 100);
+    const color = confColor(d.avgConf);
+    const gaps = d.questions.filter(q => q.confidence < 0.8).length;
+    grid.innerHTML += `
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full" style="background:${d.color}"></div>
+            <span class="font-semibold text-sm">${d.name}</span>
+          </div>
+          <span class="font-bold text-lg" style="color:${color}">${pct}%</span>
+        </div>
+        <div class="bar-bg mb-2"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="flex justify-between text-xs text-slate-400">
+          <span>${d.questions.filter(q => q.confidence >= 0.8).length}/${d.questions.length} questions covered</span>
+          ${gaps > 0 ? `<span style="color:${color}">${gaps} gap${gaps > 1 ? "s" : ""}</span>` : '<span class="text-green-400">No gaps</span>'}
+        </div>
+      </div>`;
+  });
+
+  // Gaps
+  const gapsList = document.getElementById("gaps-list");
+  gapsList.innerHTML = "";
+  if (results.gaps.length === 0) {
+    show("no-gaps");
+  } else {
+    results.gaps.forEach((g, i) => {
+      const pct = Math.round(g.confidence * 100);
+      const color = confColor(g.confidence);
+      const label = confLabel(g.confidence);
+      gapsList.innerHTML += `
+        <details class="card overflow-hidden">
+          <summary class="p-4 flex items-center gap-3">
+            <div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${color}"></div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-slate-200 truncate">${g.question}</div>
+              <div class="text-xs text-slate-400 mt-0.5">${g.domain}</div>
+            </div>
+            <div class="flex-shrink-0 flex items-center gap-2">
+              <span class="tag" style="background:${color}20;color:${color}">${label}</span>
+              <span class="font-bold text-sm" style="color:${color}">${pct}%</span>
+              <span class="text-slate-500 text-xs">▼</span>
+            </div>
+          </summary>
+          <div class="px-4 pb-4 border-t border-slate-700 pt-3 space-y-2">
+            ${g.evidence ? `<div class="text-sm"><span class="text-slate-400">Evidence found: </span><span class="text-slate-300">${g.evidence}</span></div>` : ""}
+            ${g.gap ? `<div class="text-sm"><span class="text-slate-400">Gap: </span><span class="text-yellow-300">${g.gap}</span></div>` : ""}
+            <div class="bar-bg mt-2"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          </div>
+        </details>`;
+    });
+  }
+
+  // RAI
+  const triggered = document.getElementById("rai-triggered");
+  triggered.innerHTML = rai.triggered.length
+    ? rai.triggered.map(f => `<div class="flex items-center gap-2"><span class="text-red-400">+${f.weight}</span><span class="text-slate-300">${f.label}</span></div>`).join("")
+    : '<div class="text-slate-500">No risk factors triggered</div>';
+
+  const mitigating = document.getElementById("rai-mitigating");
+  mitigating.innerHTML = rai.mitigating.length
+    ? rai.mitigating.map(f => `<div class="flex items-center gap-2"><span class="text-green-400">${f.weight}</span><span class="text-slate-300">${f.label}</span></div>`).join("")
+    : '<div class="text-slate-500">No mitigating factors identified</div>';
+
+  document.getElementById("rai-explanation").textContent = rai.reasoning || `Total RAI score: ${rai.score}. Risk tier: ${rai.tier}.`;
+}
+</script>
+</body>
+</html>
