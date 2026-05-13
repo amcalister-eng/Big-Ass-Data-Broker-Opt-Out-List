@@ -233,16 +233,44 @@ details.gap-card[open] summary { border-radius: 8px 8px 0 0; border-bottom-color
 
     <!-- TAB: GRAPH -->
     <div class="tab-panel" id="panel-graph">
-      <div class="graph-controls no-print">
-        <input type="text" id="graph-search" placeholder="Search nodes..." style="width:200px;padding:7px 12px;font-size:13px;" oninput="applyGraphFilters()">
-        <div id="domain-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-        <div style="display:flex;gap:6px;margin-left:auto;align-items:center;">
-          <button class="btn-secondary active" id="risk-all" onclick="setRiskFilter('all')">All</button>
-          <button class="btn-secondary" id="risk-gaps" onclick="setRiskFilter('gaps')">Gaps</button>
-          <button class="btn-secondary" id="risk-strong" onclick="setRiskFilter('strong')">Strong</button>
-          <button class="btn-secondary" onclick="expandAllDomains()">Expand All</button>
-          <button class="btn-secondary" onclick="collapseAllDomains()">Collapse All</button>
-          <span id="node-count" style="font-size:12px;color:var(--text-muted);white-space:nowrap;"></span>
+      <div class="graph-controls no-print" style="flex-direction:column;align-items:stretch;gap:10px;">
+        <!-- Row 1: View mode + search -->
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <div style="display:flex;background:var(--sky-pale);border:1px solid var(--midnight-border);border-radius:8px;overflow:hidden;flex-shrink:0;">
+            <button id="view-domain" onclick="setGraphMode('domain')" style="padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:var(--ocean);color:white;transition:all 0.2s;">Domain</button>
+            <button id="view-semantic" onclick="setGraphMode('semantic')" style="padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--ocean);transition:all 0.2s;">Semantic Similarity</button>
+          </div>
+          <input type="text" id="graph-search" placeholder="Search nodes..." style="width:180px;padding:7px 12px;font-size:13px;" oninput="applyGraphFilters()">
+          <span id="node-count" style="font-size:12px;color:var(--text-muted);white-space:nowrap;margin-left:auto;"></span>
+        </div>
+        <!-- Row 2: Domain mode controls -->
+        <div id="domain-controls" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Domains:</span>
+          <div id="domain-chips" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
+          <div style="display:flex;gap:5px;margin-left:auto;">
+            <button class="btn-secondary active" id="risk-all" onclick="setRiskFilter('all')">All</button>
+            <button class="btn-secondary" id="risk-gaps" onclick="setRiskFilter('gaps')">Gaps</button>
+            <button class="btn-secondary" id="risk-strong" onclick="setRiskFilter('strong')">Strong</button>
+            <button class="btn-secondary" onclick="expandAllDomains()">Expand All</button>
+            <button class="btn-secondary" onclick="collapseAllDomains()">Collapse All</button>
+          </div>
+        </div>
+        <!-- Row 2: Semantic mode controls -->
+        <div id="semantic-controls" style="display:none;gap:10px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Similarity threshold:</span>
+          <input type="range" id="sim-threshold" min="0.1" max="0.6" step="0.05" value="0.25" style="width:120px;accent-color:var(--ocean);background:transparent;border:none;padding:0;" oninput="updateThreshold(this.value)">
+          <span id="threshold-val" style="font-size:12px;font-weight:700;color:var(--ocean);min-width:32px;">25%</span>
+          <div style="display:flex;gap:12px;align-items:center;margin-left:12px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);">
+              <svg width="32" height="6"><line x1="0" y1="3" x2="32" y2="3" stroke="#FFC107" stroke-width="3" stroke-opacity="0.8"/></svg>High confidence → project
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);">
+              <svg width="32" height="6"><line x1="0" y1="3" x2="32" y2="3" stroke="#42A5F5" stroke-width="2" stroke-opacity="0.6"/></svg>Semantic similarity between criteria
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);">
+              <svg width="14" height="14"><circle cx="7" cy="7" r="7" fill="#00A651"/></svg>Large = high coverage
+            </div>
+          </div>
         </div>
       </div>
       <div style="display:flex;">
@@ -658,10 +686,15 @@ const state = {
   d3Svg: null,
   expandedDomains: new Set(),
   graphInitialised: false,
+  graphMode: 'domain',       // 'domain' | 'semantic'
+  simThreshold: 0.25,
   riskFilter: 'all',
   gapSort: 'confidence',
   searchText: '',
-  activeDomainFilters: new Set(DOMAINS.map(d => d.id))
+  activeDomainFilters: new Set(DOMAINS.map(d => d.id)),
+  allQuestions: [],
+  simMatrix: [],
+  semSim: null,
 };
 
 // ============================================================
@@ -678,7 +711,13 @@ function showTab(name) {
   document.getElementById('tab-' + name).classList.add('active');
   document.getElementById('panel-' + name).classList.add('active');
   if (name === 'overview' && !state.radarChart) initRadar();
-  if (name === 'graph') { setTimeout(() => { if (!state.graphInitialised) initGraph(); else applyGraphFilters(); }, 50); }
+  if (name === 'graph') {
+    setTimeout(() => {
+      if (state.graphMode === 'semantic') { computeSimilarityMatrix(); initSemanticGraph(); }
+      else if (!state.graphInitialised) initGraph();
+      else applyGraphFilters();
+    }, 50);
+  }
 }
 
 // ============================================================
@@ -1183,6 +1222,254 @@ function initRadar() {
 }
 
 // ============================================================
+// GRAPH MODE SWITCHING
+// ============================================================
+function setGraphMode(mode) {
+  state.graphMode = mode;
+  document.getElementById('view-domain').style.background = mode === 'domain' ? 'var(--ocean)' : 'transparent';
+  document.getElementById('view-domain').style.color = mode === 'domain' ? 'white' : 'var(--ocean)';
+  document.getElementById('view-semantic').style.background = mode === 'semantic' ? 'var(--ocean)' : 'transparent';
+  document.getElementById('view-semantic').style.color = mode === 'semantic' ? 'white' : 'var(--ocean)';
+  document.getElementById('domain-controls').style.display = mode === 'domain' ? 'flex' : 'none';
+  document.getElementById('semantic-controls').style.display = mode === 'semantic' ? 'flex' : 'none';
+  if (mode === 'domain') {
+    state.graphInitialised = false;
+    initGraph();
+  } else {
+    computeSimilarityMatrix();
+    initSemanticGraph();
+  }
+}
+
+function updateThreshold(val) {
+  state.simThreshold = parseFloat(val);
+  document.getElementById('threshold-val').textContent = Math.round(val * 100) + '%';
+  if (state.graphMode === 'semantic') {
+    computeSimilarityMatrix();
+    initSemanticGraph();
+  }
+}
+
+// ============================================================
+// TF-IDF SEMANTIC SIMILARITY ENGINE
+// ============================================================
+const STOPWORDS = new Set(['the','and','or','for','are','this','that','with','from','have','been','will','should','must','can','any','all','each','not','its','their','they','them','there','these','those','when','where','what','which','who','how','why','also','both','such','more','most','only','into','then','than','over','under','after','before','would','could','about','whether','including','ensure','provided','defined','documented','completed','conducted','reviewed','implemented','tested','assessed']);
+
+function tokenize(text) {
+  return text.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(w => w.length > 3 && !STOPWORDS.has(w));
+}
+
+function computeTFIDF(texts) {
+  const docs = texts.map(tokenize);
+  const N = docs.length;
+  const df = {};
+  docs.forEach(doc => { new Set(doc).forEach(t => { df[t] = (df[t] || 0) + 1; }); });
+  const idf = {};
+  Object.keys(df).forEach(t => { idf[t] = Math.log((N + 1) / (df[t] + 1)) + 1; });
+  return docs.map(doc => {
+    const tf = {};
+    doc.forEach(t => { tf[t] = (tf[t] || 0) + 1; });
+    const vec = {};
+    let norm = 0;
+    Object.keys(tf).forEach(t => { const v = (tf[t] / doc.length) * (idf[t] || 1); vec[t] = v; norm += v * v; });
+    norm = Math.sqrt(norm) || 1;
+    Object.keys(vec).forEach(t => { vec[t] /= norm; });
+    return vec;
+  });
+}
+
+function cosineSim(v1, v2) {
+  let dot = 0;
+  Object.keys(v1).forEach(k => { if (v2[k]) dot += v1[k] * v2[k]; });
+  return Math.min(1, Math.max(0, dot));
+}
+
+function computeSimilarityMatrix() {
+  const questions = [];
+  DOMAINS.forEach(d => {
+    d.questions.forEach((q, qi) => {
+      const res = (state.domainResults[d.id] || [])[qi] || {};
+      questions.push({
+        id: `q-${d.id}-${qi}`, domainId: d.id, domain: d, text: q,
+        confidence: typeof res.confidence === 'number' ? res.confidence : 0.3,
+        evidence: res.evidence || '', gap: res.gap || '',
+        controls: res.controls || [], standards: res.standards || [],
+      });
+    });
+  });
+  const projText = state.projectName + ' ' + state.projectDesc;
+  const vecs = computeTFIDF([projText, ...questions.map(q => q.text)]);
+  const projVec = vecs[0];
+  questions.forEach((q, i) => { q.vec = vecs[i + 1]; q.projSimilarity = cosineSim(projVec, q.vec); });
+  // Pairwise similarity (symmetric, only compute upper triangle)
+  const M = questions.length;
+  const flat = new Float32Array(M * M);
+  for (let i = 0; i < M; i++) {
+    for (let j = i + 1; j < M; j++) {
+      const s = cosineSim(questions[i].vec, questions[j].vec);
+      flat[i * M + j] = s; flat[j * M + i] = s;
+    }
+    flat[i * M + i] = 1;
+  }
+  state.allQuestions = questions;
+  state.simMatrix = { flat, M };
+}
+
+function getSim(i, j) { return state.simMatrix.flat[i * state.simMatrix.M + j]; }
+
+// ============================================================
+// SEMANTIC SIMILARITY GRAPH
+// ============================================================
+function initSemanticGraph() {
+  if (!state.allQuestions.length) return;
+  const container = document.getElementById('d3-graph-container');
+  const W = container.clientWidth || 800;
+  const H = 580;
+  const threshold = state.simThreshold;
+  const questions = state.allQuestions;
+
+  if (state.semSim) { state.semSim.stop(); state.semSim = null; }
+  d3.select('#graph-svg').selectAll('*').remove();
+  const svg = d3.select('#graph-svg').attr('width', W).attr('height', H);
+  const g = svg.append('g').attr('id', 'graph-g');
+  gZoom = d3.zoom().scaleExtent([0.15, 4]).on('zoom', ev => g.attr('transform', ev.transform));
+  svg.call(gZoom);
+
+  // Nodes
+  const nodes = [
+    { id: 'project', type: 'project', label: state.projectName, radius: 32, color: '#FFC107', confidence: 1, projSimilarity: 1, domainLabel: 'Project' }
+  ];
+  questions.forEach(q => nodes.push({
+    id: q.id, type: 'question', label: q.text, domainId: q.domainId,
+    domainLabel: q.domain.label, radius: 6 + q.confidence * 10,
+    color: q.domain.color, confidence: q.confidence,
+    projSimilarity: q.projSimilarity,
+    evidence: q.evidence, gap: q.gap, controls: q.controls, standards: q.standards,
+  }));
+
+  // Links: project→question (opacity/width by confidence) + q→q above threshold
+  const links = [];
+  questions.forEach(q => {
+    const conf = q.confidence;
+    links.push({
+      id: 'pl-' + q.id, source: 'project', target: q.id, type: 'proj-q',
+      similarity: conf,
+      strokeColor: `rgba(255,193,7,${Math.max(0.08, conf * 0.55)})`,
+      strokeWidth: Math.max(0.5, conf * 2.5),
+      distance: Math.max(70, 260 - conf * 180),
+    });
+  });
+  const M = questions.length;
+  for (let i = 0; i < M; i++) {
+    for (let j = i + 1; j < M; j++) {
+      const s = getSim(i, j);
+      if (s >= threshold) {
+        links.push({
+          id: `sl-${i}-${j}`, source: questions[i].id, target: questions[j].id, type: 'sim',
+          similarity: s,
+          strokeColor: `rgba(66,165,245,${Math.min(0.85, s * 1.1)})`,
+          strokeWidth: Math.max(0.6, s * 3),
+          distance: Math.max(25, 110 - s * 80),
+        });
+      }
+    }
+  }
+
+  const nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+  links.forEach(l => { l.source = nodeMap[l.source] || l.source; l.target = nodeMap[l.target] || l.target; });
+
+  const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id)
+      .distance(d => d.distance || 80)
+      .strength(d => d.type === 'proj-q' ? 0.2 : d.similarity * 0.9))
+    .force('charge', d3.forceManyBody().strength(d => d.type === 'project' ? -600 : -40))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collide', d3.forceCollide(d => d.radius + 3).strength(0.7));
+
+  // Draw links (sim edges behind project edges)
+  const simLinks = links.filter(l => l.type === 'sim');
+  const projLinks = links.filter(l => l.type === 'proj-q');
+  const simLinkEl = g.selectAll('.sim-link').data(simLinks).enter().append('line')
+    .attr('class', 'sim-link').attr('stroke', d => d.strokeColor).attr('stroke-width', d => d.strokeWidth);
+  const projLinkEl = g.selectAll('.proj-link').data(projLinks).enter().append('line')
+    .attr('class', 'proj-link').attr('stroke', d => d.strokeColor).attr('stroke-width', d => d.strokeWidth);
+
+  // Draw nodes
+  const nodeGroup = g.selectAll('.node-group').data(nodes).enter().append('g')
+    .attr('class', 'node-group').attr('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', (ev, d) => { if (!ev.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+      .on('end', (ev, d) => { if (!ev.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }))
+    .on('click', (ev, d) => {
+      ev.stopPropagation();
+      showNodeDetails(d);
+      highlightSemantic(d, nodes, links, simLinkEl, projLinkEl, nodeGroup);
+    });
+
+  nodeGroup.append('circle')
+    .attr('r', d => d.radius)
+    .attr('fill', d => d.color)
+    .attr('fill-opacity', d => d.type === 'project' ? 1 : 0.65 + d.confidence * 0.35)
+    .attr('stroke', d => d.type === 'project' ? '#FFE082' : 'rgba(255,255,255,0.25)')
+    .attr('stroke-width', d => d.type === 'project' ? 3 : 1);
+
+  // Project label inside circle
+  nodeGroup.filter(d => d.type === 'project').append('text')
+    .attr('text-anchor', 'middle').attr('dy', '0.35em')
+    .attr('font-size', '10px').attr('font-weight', '700').attr('fill', '#0D2D6B')
+    .attr('pointer-events', 'none')
+    .text(d => d.label.length > 14 ? d.label.slice(0, 13) + '…' : d.label);
+
+  // Tooltip on question nodes
+  nodeGroup.filter(d => d.type === 'question').append('title')
+    .text(d => `[${d.domainLabel}]\n${d.label}\n\nCoverage: ${Math.round(d.confidence * 100)}%\nProject similarity: ${Math.round(d.projSimilarity * 100)}%`);
+
+  sim.on('tick', () => {
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const tick = (el) => el
+      .attr('x1', d => clamp(d.source.x, 0, W)).attr('y1', d => clamp(d.source.y, 0, H))
+      .attr('x2', d => clamp(d.target.x, 0, W)).attr('y2', d => clamp(d.target.y, 0, H));
+    tick(simLinkEl); tick(projLinkEl);
+    nodeGroup.attr('transform', d => `translate(${clamp(d.x, d.radius, W - d.radius)},${clamp(d.y, d.radius, H - d.radius)})`);
+  });
+
+  svg.on('click', () => resetHighlight(simLinkEl, projLinkEl, nodeGroup));
+  state.semSim = sim;
+  gSvg = svg;
+  gZoom = d3.zoom().scaleExtent([0.15, 4]).on('zoom', ev => g.attr('transform', ev.transform));
+  svg.call(gZoom);
+  updateNodeCount();
+}
+
+function highlightSemantic(d, nodes, links, simLinkEl, projLinkEl, nodeGroup) {
+  const connected = new Set([d.id]);
+  links.forEach(l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sid === d.id) connected.add(tid);
+    if (tid === d.id) connected.add(sid);
+  });
+  simLinkEl
+    .attr('stroke-opacity', l => (l.source.id === d.id || l.target.id === d.id) ? 1 : 0.04)
+    .attr('stroke-width', l => (l.source.id === d.id || l.target.id === d.id) ? l.strokeWidth * 1.8 : l.strokeWidth);
+  projLinkEl
+    .attr('stroke-opacity', l => (l.source.id === d.id || l.target.id === d.id) ? 1 : 0.04);
+  nodeGroup.select('circle')
+    .attr('fill-opacity', n => connected.has(n.id) ? 1 : 0.1)
+    .attr('stroke-width', n => n.id === d.id ? 3 : (connected.has(n.id) ? 2 : 1));
+}
+
+function resetHighlight(simLinkEl, projLinkEl, nodeGroup) {
+  simLinkEl.attr('stroke-opacity', 1).attr('stroke-width', d => d.strokeWidth);
+  projLinkEl.attr('stroke-opacity', 1);
+  nodeGroup.select('circle')
+    .attr('fill-opacity', d => d.type === 'project' ? 1 : 0.65 + d.confidence * 0.35)
+    .attr('stroke-width', d => d.type === 'project' ? 3 : 1);
+}
+
+// ============================================================
 // D3 FORCE GRAPH
 // ============================================================
 function buildDomainChips() {
@@ -1416,11 +1703,44 @@ function showNodeDetails(d) {
   }
   if (d.evidence) html += `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">Evidence</div><p style="font-size:12px;line-height:1.5;margin:0;color:var(--text-primary);">${escHtml(d.evidence)}</p></div>`;
   if (d.gap) html += `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">Gap</div><p style="font-size:12px;line-height:1.5;margin:0;color:var(--text-primary);">${escHtml(d.gap)}</p></div>`;
+  // Semantic similarity section (only in semantic mode)
+  if (state.graphMode === 'semantic' && d.type === 'question' && state.allQuestions.length) {
+    const projSim = typeof d.projSimilarity === 'number' ? d.projSimilarity : 0;
+    const projSimColor = projSim >= 0.5 ? '#00A651' : projSim >= 0.3 ? '#FFC107' : '#F26522';
+    html += `<div style="margin-bottom:12px;padding:10px;background:var(--sky-pale);border-radius:8px;border:1px solid var(--midnight-border);">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Semantic Similarity to Project</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="conf-bar" style="flex:1;"><div class="conf-fill" style="width:${Math.round(projSim*100)}%;background:${projSimColor};"></div></div>
+        <span style="font-size:13px;font-weight:700;color:${projSimColor};">${Math.round(projSim * 100)}%</span>
+      </div>
+    </div>`;
+    // Top 3 most similar other questions
+    const qi = state.allQuestions.findIndex(q => q.id === d.id);
+    if (qi >= 0 && state.simMatrix.M) {
+      const sims = state.allQuestions.map((q, j) => ({ q, s: j === qi ? -1 : getSim(qi, j) }))
+        .filter(x => x.s > 0.15).sort((a, b) => b.s - a.s).slice(0, 4);
+      if (sims.length) {
+        html += `<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Most Similar Criteria</div>`;
+        sims.forEach(({ q, s }) => {
+          const sColor = s >= 0.4 ? 'var(--ocean)' : 'var(--text-muted)';
+          html += `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:7px;padding:6px 8px;background:white;border-radius:6px;border:1px solid var(--midnight-border);">
+            <div style="width:8px;height:8px;border-radius:50%;background:${q.domain.color};flex-shrink:0;margin-top:4px;"></div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:11px;font-weight:600;color:var(--text-muted);">${escHtml(q.domain.label)}</div>
+              <div style="font-size:11px;color:var(--text-primary);line-height:1.4;">${escHtml(q.text.substring(0, 70))}${q.text.length > 70 ? '…' : ''}</div>
+            </div>
+            <span style="font-size:11px;font-weight:700;color:${sColor};flex-shrink:0;">${Math.round(s * 100)}%</span>
+          </div>`;
+        });
+        html += `</div>`;
+      }
+    }
+  }
   if (d.controls && d.controls.length) {
     html += `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">Controls</div><ul style="margin:0;padding-left:14px;font-size:12px;line-height:1.7;color:var(--text-primary);">${d.controls.map(c => `<li>${escHtml(c)}</li>`).join('')}</ul></div>`;
   }
   if (d.standards && d.standards.length) {
-    html += `<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Standards</div>${d.standards.map(s => `<span style="background:rgba(66,165,245,0.12);color:var(--sky-light);padding:2px 8px;border-radius:10px;font-size:11px;margin-right:3px;margin-bottom:3px;display:inline-block;">${escHtml(s)}</span>`).join('')}</div>`;
+    html += `<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Standards</div>${d.standards.map(s => `<span style="background:rgba(21,101,192,0.1);color:var(--ocean);border:1px solid rgba(21,101,192,0.2);padding:2px 8px;border-radius:10px;font-size:11px;margin-right:3px;margin-bottom:3px;display:inline-block;">${escHtml(s)}</span>`).join('')}</div>`;
   }
   content.innerHTML = html;
 }
