@@ -507,6 +507,142 @@ const RAI_MITIGATIONS = [
 ];
 
 // ============================================================
+// GOVERNANCE PATTERN ADVICE — per domain
+// ============================================================
+const DOMAIN_GOVERNANCE_ACTIONS = {
+  privacy: {
+    action: "Initiate a Privacy Impact Assessment (PIA)",
+    contact: "Privacy & Data Protection team",
+    urgency: "Must be completed before any personal data is collected or processed",
+    icon: "🔒",
+    steps: [
+      "Raise a PIA request in the Privacy Portal and assign a Privacy Officer",
+      "Map all personal data flows against the 13 Australian Privacy Principles (APPs)",
+      "Document lawful basis and consent architecture for each data category",
+      "Draft Privacy Notice / Collection Statement for stakeholder review",
+      "Submit completed PIA to the Privacy team for formal sign-off before go-live",
+    ]
+  },
+  supplier: {
+    action: "Complete a Supplier Impact Assessment (SIA)",
+    contact: "Procurement & Third Party Risk team",
+    urgency: "Required before any AI vendor contract is signed or API key is provisioned",
+    icon: "🤝",
+    steps: [
+      "Log each AI vendor, model provider, and API in the Third Party Risk Register",
+      "Complete the SIA questionnaire for each supplier covering AI-specific risks",
+      "Engage Legal to negotiate AI governance, data handling, and audit rights clauses",
+      "Obtain CISO sign-off on vendor security controls and data residency",
+      "Review sub-processor (fourth-party) risk and document exit / data portability provisions",
+    ]
+  },
+  agentic: {
+    action: "Submit to the Agentic Review Board (ARB)",
+    contact: "Agentic Review Board — raise via the AI Council portal",
+    urgency: "Required before any autonomous agent capability is deployed to production",
+    icon: "🤖",
+    steps: [
+      "Define and document the agent's autonomy level (L0–L5) and action boundaries",
+      "Design the human-in-the-loop checkpoint process and test the emergency stop",
+      "Produce a blast-radius analysis showing the maximum impact of an agent error",
+      "Complete the ARB submission form with architecture diagram and safety controls",
+      "Obtain signed ARB Decision Record (ADR) — deployment is blocked without it",
+    ]
+  },
+  cyber: {
+    action: "Engage CISO for a Security Impact Assessment (SIA)",
+    contact: "Cyber Security Architecture team — raise via ServiceNow Security Requests",
+    urgency: "Required before production deployment — no exceptions",
+    icon: "🛡️",
+    steps: [
+      "Raise a Security Assessment request in ServiceNow with data classification and architecture diagram",
+      "Complete the CIS8 control checklist for all AI infrastructure components",
+      "Submit threat model (STRIDE or equivalent) covering AI-specific attack surfaces",
+      "Arrange independent penetration testing of model endpoints and API layer",
+      "Obtain written CISO sign-off — include in ARB and AI Council evidence pack",
+    ]
+  },
+  ethics: {
+    action: "Complete an Ethics & Fairness Review",
+    contact: "Responsible AI team / Ethics Review Board",
+    urgency: "Required for any system that may affect individuals, especially external customers",
+    icon: "⚖️",
+    steps: [
+      "Run bias and fairness testing across all protected characteristics (gender, age, ethnicity, disability)",
+      "Complete the Ethics Review form and submit to the Responsible AI team",
+      "If flagged high-risk, schedule Ethics Board review session",
+      "Document agreed fairness metrics and commit to ongoing production monitoring",
+      "Publish results in the AI Transparency Register if required by policy",
+    ]
+  },
+  model_risk: {
+    action: "Register in the Enterprise Model Risk Register",
+    contact: "Model Risk Management team",
+    urgency: "Required before the model is promoted to production",
+    icon: "📊",
+    steps: [
+      "Complete a model card covering purpose, architecture, training data, and known failure modes",
+      "Submit to Model Risk for independent validation by a party outside the dev team",
+      "Configure production monitoring with drift detection and accuracy alerting",
+      "Schedule quarterly model performance reviews with defined retraining triggers",
+      "Log the model in the enterprise Model Inventory with accountable model owner assigned",
+    ]
+  },
+  data_governance: {
+    action: "Complete a Data Governance Assessment",
+    contact: "Data Governance & Architecture team — raise via the Data Portal",
+    urgency: "Required before training data ingestion or feature pipeline build begins",
+    icon: "🗂️",
+    steps: [
+      "Create Data Catalogue entries for all training, validation, and inference datasets",
+      "Obtain Data Steward approval and confirm data sharing agreements are in place",
+      "Document full data lineage from raw source to model prediction",
+      "Implement automated data quality checks (completeness, accuracy, drift) in the pipeline",
+      "Confirm data retention, deletion, and correction processes are technically enforced",
+    ]
+  },
+  operational: {
+    action: "Complete an Operational Readiness Review (OAT)",
+    contact: "Operations & Change Management team — raise via ServiceNow Change",
+    urgency: "Required before go-live — must include load test sign-off",
+    icon: "⚙️",
+    steps: [
+      "Write and test the AI system runbook covering top 10 failure scenarios",
+      "Update Business Continuity and Disaster Recovery plans to include this system",
+      "Complete load testing at 150% of expected peak load with results documented",
+      "Run a game day or chaos engineering exercise and document findings",
+      "Confirm on-call roster and escalation paths are updated and communicated",
+    ]
+  },
+  regulatory: {
+    action: "Obtain Legal & Compliance Review",
+    contact: "Legal, Risk & Compliance team — contact via the Legal Portal",
+    urgency: "Required before any go-live in a regulated context or external deployment",
+    icon: "📋",
+    steps: [
+      "Complete a regulatory landscape assessment for all jurisdictions where the system will operate",
+      "Classify the system under the EU AI Act and produce the required conformity evidence",
+      "Obtain legal opinion on training data copyright, IP, and database rights",
+      "Map each regulatory requirement to a specific technical control in the compliance register",
+      "Engage regulators for pre-approval or notification where required by applicable law",
+    ]
+  },
+  arb: {
+    action: "Submit for Architecture Review Board (ARB) approval",
+    contact: "Enterprise Architecture team — arb@company — next ARB session booking via EA Portal",
+    urgency: "Must be completed before any build, buy, or cloud provisioning",
+    icon: "🏛️",
+    steps: [
+      "Prepare ARB submission: architecture diagram, ADR log, technology register check",
+      "Confirm all components and platforms are on the approved technology register",
+      "Book and present to the next scheduled ARB session",
+      "Obtain a signed Architecture Decision Record (ADR) before proceeding",
+      "If using AI Council gate, coordinate the ARB sign-off as part of the evidence pack",
+    ]
+  },
+};
+
+// ============================================================
 // STATE
 // ============================================================
 const state = {
@@ -786,22 +922,65 @@ function renderGapsTab() {
     </div>`;
     return;
   }
+
+  // ── Governance Actions Summary banner ──────────────────────────────────
+  const actionsNeeded = [];
+  const seenDomains = new Set();
+  gapItems.forEach(g => {
+    if (!seenDomains.has(g.domain.id)) {
+      seenDomains.add(g.domain.id);
+      const advice = DOMAIN_GOVERNANCE_ACTIONS[g.domain.id];
+      if (advice) actionsNeeded.push({ domain: g.domain, advice });
+    }
+  });
+
+  const summaryEl = document.createElement('div');
+  summaryEl.style.cssText = 'background:var(--sky-pale);border:1px solid var(--midnight-border);border-radius:10px;padding:18px 20px;margin-bottom:20px;';
+  summaryEl.innerHTML = `
+    <div style="font-size:13px;font-weight:700;color:var(--ocean);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">
+      &#9658; Governance Actions Required
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${actionsNeeded.map((a, i) => `
+        <div style="display:flex;align-items:flex-start;gap:12px;background:white;border:1px solid var(--midnight-border);border-left:4px solid ${a.domain.color};border-radius:8px;padding:10px 14px;">
+          <span style="font-size:20px;flex-shrink:0;">${a.advice.icon}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;color:var(--text-primary);">${escHtml(a.advice.action)}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Contact: <strong>${escHtml(a.advice.contact)}</strong></div>
+            <div style="font-size:11px;color:var(--earth);margin-top:3px;font-weight:600;">${escHtml(a.advice.urgency)}</div>
+          </div>
+          <span style="font-size:11px;background:${a.domain.color}22;color:${a.domain.color};border:1px solid ${a.domain.color}44;padding:2px 8px;border-radius:10px;font-weight:700;flex-shrink:0;">${escHtml(a.domain.label)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  container.appendChild(summaryEl);
+
+  // ── Individual gap cards ───────────────────────────────────────────────
   gapItems.forEach((g, i) => {
     const conf = Math.round(g.confidence * 100);
     const confColor = g.confidence >= 0.8 ? 'var(--land)' : g.confidence >= 0.5 ? 'var(--sun)' : 'var(--earth)';
     const riskLabel = g.confidence < 0.3 ? 'Critical Gap' : g.confidence < 0.5 ? 'High Gap' : g.confidence < 0.8 ? 'Moderate Gap' : 'Low Gap';
+    const govAdvice = DOMAIN_GOVERNANCE_ACTIONS[g.domain.id];
     const det = document.createElement('details');
     det.className = 'gap-card';
     const ctrlHtml = g.controls.length ? g.controls.map(c => `<li>${escHtml(c)}</li>`).join('') : '<li>No specific controls provided.</li>';
-    const stdHtml = g.standards.length ? g.standards.map(s => `<span style="background:rgba(66,165,245,0.12);color:var(--sky-light);padding:2px 8px;border-radius:10px;font-size:11px;margin-right:4px;margin-bottom:4px;display:inline-block;">${escHtml(s)}</span>`).join('') : '';
+    const stdHtml = g.standards.length ? g.standards.map(s => `<span style="background:rgba(21,101,192,0.1);color:var(--ocean);border:1px solid rgba(21,101,192,0.2);padding:2px 8px;border-radius:10px;font-size:11px;margin-right:4px;margin-bottom:4px;display:inline-block;">${escHtml(s)}</span>`).join('') : '';
+    const govStepsHtml = govAdvice ? govAdvice.steps.map((s, si) =>
+      `<div style="display:flex;gap:10px;margin-bottom:8px;">
+        <div style="width:22px;height:22px;border-radius:50%;background:var(--ocean);color:white;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${si + 1}</div>
+        <span style="font-size:13px;color:var(--text-primary);line-height:1.5;padding-top:3px;">${escHtml(s)}</span>
+      </div>`
+    ).join('') : '';
     det.innerHTML = `
       <summary>
         <div class="dot-indicator" style="background:${g.domain.color};"></div>
         <span style="flex:1;font-size:13px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:400px;" title="${escHtml(g.questionText)}">${escHtml(g.questionText.substring(0, 90))}${g.questionText.length > 90 ? '...' : ''}</span>
         <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:12px;">
+          <span style="font-size:11px;color:var(--text-muted);">${escHtml(g.domain.label)}</span>
           <div class="conf-bar" style="width:80px;"><div class="conf-fill" style="width:${conf}%;background:${confColor};"></div></div>
           <span style="font-size:11px;font-weight:700;color:${confColor};width:30px;text-align:right;">${conf}%</span>
-          <span style="font-size:11px;font-weight:700;color:${confColor};padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.06);">${riskLabel}</span>
+          <span style="font-size:11px;font-weight:700;color:${confColor};padding:2px 8px;border-radius:10px;background:${g.confidence < 0.3 ? 'var(--berry-light)' : g.confidence < 0.5 ? 'var(--earth-light)' : 'var(--sun-light)'};">${riskLabel}</span>
         </div>
       </summary>
       <div class="gap-body">
@@ -815,11 +994,30 @@ function renderGapsTab() {
             <p style="font-size:13px;color:var(--text-primary);margin:0;line-height:1.6;">${escHtml(g.gap || 'No specific gap described.')}</p>
           </div>
         </div>
-        <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Recommended Controls</div>
-          <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--text-primary);">${ctrlHtml}</ul>
+        ${govAdvice ? `
+        <div style="background:white;border:1px solid var(--midnight-border);border-left:4px solid ${g.domain.color};border-radius:8px;padding:14px 16px;margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="font-size:18px;">${govAdvice.icon}</span>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--ocean);text-transform:uppercase;letter-spacing:0.07em;">Governance Action Required</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text-primary);">${escHtml(govAdvice.action)}</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">&#128222; Contact: <strong style="color:var(--text-primary);">${escHtml(govAdvice.contact)}</strong></div>
+          <div style="font-size:12px;color:var(--earth);font-weight:600;margin-bottom:12px;">&#9888; ${escHtml(govAdvice.urgency)}</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Next Steps</div>
+          ${govStepsHtml}
+        </div>` : ''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Recommended Controls</div>
+            <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--text-primary);">${ctrlHtml}</ul>
+          </div>
+          ${stdHtml ? `<div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Standards & References</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">${stdHtml}</div>
+          </div>` : '<div></div>'}
         </div>
-        ${stdHtml ? `<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Standards & References</div><div>${stdHtml}</div></div>` : ''}
       </div>
     `;
     container.appendChild(det);
